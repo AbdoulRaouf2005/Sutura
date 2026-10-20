@@ -368,16 +368,5 @@ La V1 est prête à être testée par le couturier lorsque :
 
 ---
 
-## 9. Questions métier à valider avant de figer les écrans
-
-À confirmer avec le couturier :
-- la liste exacte des mensurations selon les types de vêtements ;
-- les catégories de modèles qu'il utilise ;
-- s'il facture par vêtement, par lot ou par commande ;
-- s'il accepte les paiements partiels et comment il gère les trop-perçus ;
-- les statuts qui correspondent à sa manière de travailler ;
-- s'il souhaite un rappel le jour précédant la livraison ;
-- s'il veut conserver les clients inactifs ou les archiver ;
-- le format de sauvegarde le plus pratique pour lui.
 
 **Principe de réalisation :** développer d'abord un petit flux complet — client, mensurations, modèle, commande, paiement — puis améliorer les écrans à partir des retours réels du couturier.
