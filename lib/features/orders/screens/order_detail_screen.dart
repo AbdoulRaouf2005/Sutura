@@ -5,6 +5,8 @@ import '../../../core/repositories/client_repository.dart';
 import '../../../core/repositories/measurement_repository.dart';
 import '../../../core/repositories/order_repository.dart';
 import '../../../core/repositories/payment_repository.dart';
+import '../../../core/state/data_controller.dart';
+import '../../../core/state/data_events_listener.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/formatters/formatters.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
@@ -27,7 +29,8 @@ class OrderDetailScreen extends StatefulWidget {
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
 
-class _OrderDetailScreenState extends State<OrderDetailScreen> {
+class _OrderDetailScreenState extends State<OrderDetailScreen>
+    with DataEventsListener<OrderDetailScreen> {
   final OrderRepository _orders = OrderRepository();
   final ClientRepository _clients = ClientRepository();
   final MeasurementRepository _measurements = MeasurementRepository();
@@ -37,10 +40,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _changed = false;
 
   @override
+  Set<DataEntity> get dataEntities => const <DataEntity>{
+        DataEntity.orders,
+        DataEntity.clients,
+        DataEntity.measurements,
+        DataEntity.payments,
+      };
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
+
+  @override
+  void onDataChanged() => _load();
 
   void _load() {
     setState(() {
@@ -112,10 +126,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 final bool? changed = await context.push<bool>(
                   '/commandes/${widget.orderId}/modifier',
                 );
-                if (changed == true) {
-                  _changed = true;
-                  _load();
-                }
+                if (changed == true) _changed = true;
               },
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Modifier',
@@ -151,12 +162,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               const SizedBox(height: AppSpacing.lg),
               _BalanceCard(
                 balance: data.balance,
-                onManagePayments: () async {
-                  final bool? changed = await context.push<bool>(
-                    '/commandes/${order.id}/paiements',
-                  );
-                  if (changed == true) _load();
-                },
+                onManagePayments: () =>
+                    context.push('/commandes/${order.id}/paiements'),
               ),
               if (data.measurements.isNotEmpty) ...<Widget>[
                 const SizedBox(height: AppSpacing.lg),

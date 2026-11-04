@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/repositories/client_repository.dart';
 import '../../../core/repositories/measurement_repository.dart';
+import '../../../core/state/data_controller.dart';
+import '../../../core/state/data_events_listener.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/formatters/formatters.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -20,17 +22,27 @@ class MeasurementsListScreen extends StatefulWidget {
   State<MeasurementsListScreen> createState() => _MeasurementsListScreenState();
 }
 
-class _MeasurementsListScreenState extends State<MeasurementsListScreen> {
+class _MeasurementsListScreenState extends State<MeasurementsListScreen>
+    with DataEventsListener<MeasurementsListScreen> {
   final MeasurementRepository _repo = MeasurementRepository();
   final ClientRepository _clients = ClientRepository();
 
   Future<_MeasurementsListData>? _future;
 
   @override
+  Set<DataEntity> get dataEntities => const <DataEntity>{
+        DataEntity.measurements,
+        DataEntity.clients,
+      };
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
+
+  @override
+  void onDataChanged() => _load();
 
   void _load() {
     setState(() {
@@ -50,12 +62,8 @@ class _MeasurementsListScreenState extends State<MeasurementsListScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Mensurations')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final bool? changed = await context.push<bool>(
-            '/clients/${widget.clientId}/mensurations/nouveau',
-          );
-          if (changed == true) _load();
-        },
+        onPressed: () =>
+            context.push('/clients/${widget.clientId}/mensurations/nouveau'),
         icon: const Icon(Icons.add),
         label: const Text('Ajouter'),
       ),
@@ -78,14 +86,11 @@ class _MeasurementsListScreenState extends State<MeasurementsListScreen> {
               icon: Icons.straighten,
               message: 'Aucune mensuration pour le moment. '
                   'Ajoutez un premier jeu de mesures.',
-              actionLabel: 'Ajouter des mensurations',
-              onAction: () async {
-                final bool? changed = await context.push<bool>(
-                  '/clients/${widget.clientId}/mensurations/nouveau',
-                );
-                if (changed == true) _load();
-              },
-            );
+                    actionLabel: 'Ajouter des mensurations',
+                    onAction: () => context.push(
+                      '/clients/${widget.clientId}/mensurations/nouveau',
+                    ),
+                  );
           }
           return Column(
             children: <Widget>[

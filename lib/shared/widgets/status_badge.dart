@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_semantic_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../features/orders/models/order.dart';
 
@@ -11,32 +12,35 @@ class StatusBadge extends StatelessWidget {
 
   final OrderStatus status;
 
-  ({Color color, IconData icon}) get _style => switch (status) {
-        OrderStatus.toStart => (
-            color: AppColors.textSecondary,
+  ({Color color, IconData icon}) _style(BuildContext context) {
+    final AppSemanticColors semantic = AppSemanticColors.of(context);
+    return switch (status) {
+      OrderStatus.toStart => (
+            color: semantic.onSurfaceMuted,
             icon: Icons.schedule_outlined,
           ),
-        OrderStatus.inProgress => (
+      OrderStatus.inProgress => (
             color: AppColors.accent,
             icon: Icons.construction_outlined,
           ),
-        OrderStatus.ready => (
-            color: AppColors.success,
+      OrderStatus.ready => (
+            color: semantic.success,
             icon: Icons.check_circle_outline,
           ),
-        OrderStatus.delivered => (
-            color: AppColors.success,
+      OrderStatus.delivered => (
+            color: semantic.success,
             icon: Icons.local_shipping_outlined,
           ),
-        OrderStatus.cancelled => (
-            color: AppColors.error,
+      OrderStatus.cancelled => (
+            color: semantic.error,
             icon: Icons.cancel_outlined,
           ),
-      };
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
-    final ({Color color, IconData icon}) style = _style;
+    final ({Color color, IconData icon}) style = _style(context);
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
@@ -71,26 +75,27 @@ class LateBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Color color = AppSemanticColors.of(context).error;
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.error),
-          SizedBox(width: AppSpacing.xs),
+          Icon(Icons.warning_amber_rounded, size: 14, color: color),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             'En retard',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.error,
+              color: color,
             ),
           ),
         ],

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/services/backup_service.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_semantic_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/theme_controller.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 
 /// Préférences et sauvegarde (cahier des charges §4.7).
@@ -28,7 +29,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         content: Text(ok
             ? 'Sauvegarde partagée / enregistrée.'
             : 'L\'export de la sauvegarde a échoué.'),
-        backgroundColor: ok ? null : AppColors.error,
+        backgroundColor: ok ? null : AppSemanticColors.of(context).error,
       ),
     );
   }
@@ -54,7 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ? 'Sauvegarde restaurée. L\'application peut nécessiter un '
                 'redémarrage pour un affichage optimal.'
             : 'La restauration a échoué. Vérifiez le fichier zip.'),
-        backgroundColor: ok ? null : AppColors.error,
+        backgroundColor: ok ? null : AppSemanticColors.of(context).error,
       ),
     );
   }
@@ -62,7 +63,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Réglages')),
+      appBar: AppBar(
+        title: const Text('Réglages'),
+        actions: const <Widget>[_ThemeToggleButton()],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: <Widget>[
@@ -74,6 +78,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: const Text('Version $_appVersion'),
             ),
           ),
+          const SizedBox(height: AppSpacing.lg),
+          const _SectionHeader('Apparence'),
+          const _ThemeSelector(),
           const SizedBox(height: AppSpacing.lg),
           const _SectionHeader('Préférences'),
           Card(
@@ -136,13 +143,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: AppColors.warning.withValues(alpha: 0.10),
+              color: AppSemanticColors.of(context).warning.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const <Widget>[
-                Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+              children: <Widget>[
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppSemanticColors.of(context).warning,
+                ),
                 SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Text(
@@ -180,6 +190,114 @@ class _SectionHeader extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
         ),
       ),
+    );
+  }
+}
+
+/// Sélecteur de thème : clair, sombre ou suivi du système.
+class _ThemeSelector extends StatelessWidget {
+  const _ThemeSelector();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text(
+              'Thème de l\'application',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Choisissez l\'apparence claire ou sombre, ou suivez le réglage '
+              'de votre appareil.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            ListenableBuilder(
+              listenable: ThemeController.instance,
+              builder: (BuildContext context, Widget? child) {
+                return SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<ThemeMode>(
+                    showSelectedIcon: false,
+                    expandedInsets: EdgeInsets.zero,
+                    segments: const <ButtonSegment<ThemeMode>>[
+                      ButtonSegment<ThemeMode>(
+                        value: ThemeMode.light,
+                        label: Text(
+                          'Clair',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ButtonSegment<ThemeMode>(
+                        value: ThemeMode.dark,
+                        label: Text(
+                          'Sombre',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ButtonSegment<ThemeMode>(
+                        value: ThemeMode.system,
+                        label: Text(
+                          'Système',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                    selected: <ThemeMode>{ThemeController.instance.themeMode},
+                    onSelectionChanged: (Set<ThemeMode> selection) {
+                      ThemeController.instance.setThemeMode(selection.first);
+                    },
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bouton rapide clair/sombre dans la barre d'application.
+class _ThemeToggleButton extends StatelessWidget {
+  const _ThemeToggleButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (BuildContext context, Widget? child) {
+        final ThemeMode mode = ThemeController.instance.themeMode;
+        final bool isDark = mode == ThemeMode.dark ||
+            (mode == ThemeMode.system &&
+                MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+        return IconButton(
+          tooltip: isDark ? 'Passer en thème clair' : 'Passer en thème sombre',
+          icon: Icon(
+            isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+          ),
+          onPressed: () {
+            ThemeController.instance.toggleDark(
+              systemIsDark:
+                  MediaQuery.platformBrightnessOf(context) == Brightness.dark,
+            );
+          },
+        );
+      },
     );
   }
 }

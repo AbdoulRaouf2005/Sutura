@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/state/data_controller.dart';
 import '../../features/measurements/models/measurement_set.dart';
 
 /// Accès aux mensurations (tables `measurement_sets` et `measurements`).
@@ -64,6 +65,7 @@ class MeasurementRepository {
         );
       }
     });
+    DataController.instance.notify(DataEntity.measurements);
   }
 
   Future<void> deleteSet(String setId) async {
@@ -80,5 +82,6 @@ class MeasurementRepository {
         whereArgs: <Object?>[setId],
       );
     });
+    DataController.instance.notify(DataEntity.measurements);
   }
 }

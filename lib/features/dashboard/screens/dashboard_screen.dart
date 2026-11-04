@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/repositories/client_repository.dart';
 import '../../../core/repositories/order_repository.dart';
 import '../../../core/repositories/payment_repository.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/state/data_controller.dart';
+import '../../../core/state/data_events_listener.dart';
+import '../../../core/theme/app_semantic_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/formatters/formatters.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -34,7 +36,8 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with DataEventsListener<DashboardScreen> {
   final OrderRepository _orders = OrderRepository();
   final PaymentRepository _payments = PaymentRepository();
   final ClientRepository _clients = ClientRepository();
@@ -42,15 +45,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<DashboardData>? _future;
 
   @override
+  Set<DataEntity> get dataEntities => const <DataEntity>{
+    DataEntity.orders,
+    DataEntity.payments,
+    DataEntity.clients,
+  };
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
 
-  void _load() {
+  @override
+  void onDataChanged() => _load();
+
+  Future<void> _load() async {
+    final Future<DashboardData> future = _fetch();
     setState(() {
-      _future = _fetch();
+      _future = future;
     });
+    await future;
   }
 
   Future<DashboardData> _fetch() async {
@@ -73,11 +88,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Accueil')),
       body: RefreshIndicator(
-        onRefresh: () async => _load(),
+        onRefresh: _load,
         child: FutureBuilder<DashboardData>(
           future: _future,
-          builder: (BuildContext context,
-              AsyncSnapshot<DashboardData> snapshot) {
+          builder: (BuildContext context, AsyncSnapshot<DashboardData> snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
@@ -110,6 +124,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _SectionTitle(
                   icon: Icons.calendar_month_outlined,
                   label: 'À livrer bientôt',
+                  actionLabel: 'Voir tout',
+                  onAction: () => context.push('/commandes'),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 _UpcomingList(orders: data.upcomingOrders),
@@ -149,7 +165,7 @@ class _KpiGrid extends StatelessWidget {
                 icon: Icons.assignment_outlined,
                 label: 'En cours',
                 value: '${data.activeOrders}',
-                color: AppColors.primary,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -158,7 +174,7 @@ class _KpiGrid extends StatelessWidget {
                 icon: Icons.warning_amber_rounded,
                 label: 'En retard',
                 value: '${data.lateOrders}',
-                color: AppColors.error,
+                color: AppSemanticColors.of(context).error,
               ),
             ),
           ],
@@ -168,7 +184,7 @@ class _KpiGrid extends StatelessWidget {
           icon: Icons.payments_outlined,
           label: 'Restant à encaisser',
           value: Formatters.money(data.totalOutstanding),
-          color: AppColors.success,
+          color: AppSemanticColors.of(context).success,
           wide: true,
         ),
       ],
@@ -216,9 +232,7 @@ class _KpiCard extends StatelessWidget {
                     label,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
+                      color: Theme.of(context).colorScheme.onSurface
                           .withValues(alpha: 0.65),
                     ),
                   ),
@@ -243,21 +257,32 @@ class _KpiCard extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.icon, required this.label});
+  const _SectionTitle({
+    required this.icon,
+    required this.label,
+    this.actionLabel,
+    this.onAction,
+  });
 
   final IconData icon;
   final String label;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: <Widget>[
-        Icon(icon, size: 18, color: AppColors.primary),
+        Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
         const SizedBox(width: AppSpacing.sm),
         Text(
           label,
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
+        if (onAction != null && actionLabel != null) ...<Widget>[
+          const Spacer(),
+          TextButton(onPressed: onAction, child: Text(actionLabel!)),
+        ],
       ],
     );
   }
@@ -280,13 +305,29 @@ class _UpcomingList extends StatelessWidget {
     }
     return Column(
       children: orders.take(5).map((Order order) {
+        final bool late = order.isLate();
         return Card(
           margin: const EdgeInsets.only(bottom: AppSpacing.sm),
           child: ListTile(
             leading: const Icon(Icons.local_mall_outlined),
             title: Text(order.modelNameSnapshot ?? 'Commande'),
             subtitle: Text('Livraison : ${Formatters.date(order.deliveryAt)}'),
-            trailing: order.isLate() ? null : Text(order.status.label),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  late ? 'En retard' : order.status.label,
+                  style: late
+                      ? TextStyle(
+                          color: AppSemanticColors.of(context).error,
+                          fontWeight: FontWeight.w600,
+                        )
+                      : null,
+                ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+            onTap: () => context.push('/commandes/${order.id}'),
           ),
         );
       }).toList(),
@@ -358,7 +399,11 @@ class _ActionTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
           child: Column(
             children: <Widget>[
-              Icon(icon, color: AppColors.primary, size: 26),
+              Icon(
+                icon,
+                color: Theme.of(context).colorScheme.primary,
+                size: 26,
+              ),
               const SizedBox(height: AppSpacing.sm),
               Text(
                 label,

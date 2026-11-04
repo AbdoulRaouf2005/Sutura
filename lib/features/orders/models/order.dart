@@ -145,3 +145,14 @@ class Order {
         updatedAt: updatedAt ?? this.updatedAt,
       );
 }
+
+/// Commande accompagnée du nom de son client.
+///
+/// Utilisé par les listes qui affichent les deux informations : le nom est
+/// récupéré par jointure, sans requête supplémentaire par commande.
+class OrderWithClient {
+  const OrderWithClient({required this.order, required this.clientName});
+
+  final Order order;
+  final String clientName;
+}

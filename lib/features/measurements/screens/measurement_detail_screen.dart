@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/repositories/measurement_repository.dart';
+import '../../../core/state/data_controller.dart';
+import '../../../core/state/data_events_listener.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/formatters/formatters.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
@@ -26,16 +28,25 @@ class MeasurementDetailScreen extends StatefulWidget {
       _MeasurementDetailScreenState();
 }
 
-class _MeasurementDetailScreenState extends State<MeasurementDetailScreen> {
+class _MeasurementDetailScreenState extends State<MeasurementDetailScreen>
+    with DataEventsListener<MeasurementDetailScreen> {
   final MeasurementRepository _repo = MeasurementRepository();
 
   Future<_MeasurementDetailData>? _future;
+
+  @override
+  Set<DataEntity> get dataEntities => const <DataEntity>{
+        DataEntity.measurements,
+      };
 
   @override
   void initState() {
     super.initState();
     _load();
   }
+
+  @override
+  void onDataChanged() => _load();
 
   void _load() {
     setState(() {

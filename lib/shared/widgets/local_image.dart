@@ -10,6 +10,7 @@ class LocalImage extends StatelessWidget {
     required this.path,
     this.fit = BoxFit.cover,
     this.label,
+    this.cacheWidth,
   });
 
   final String? path;
@@ -17,6 +18,10 @@ class LocalImage extends StatelessWidget {
 
   /// Texte alternatif/accessible pour l'image (guide §11).
   final String? label;
+
+  /// Largeur de décodage en pixels. Réduit la mémoire utilisée pour les
+  /// vignettes d'une grille tout en gardant l'image nette.
+  final int? cacheWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +33,7 @@ class LocalImage extends StatelessWidget {
       fit: fit,
       semanticLabel: label,
       gaplessPlayback: true,
+      cacheWidth: cacheWidth,
       errorBuilder: (_, _, _) =>
           const _Placeholder(icon: Icons.broken_image_outlined),
     );
@@ -46,7 +52,8 @@ class _Placeholder extends StatelessWidget {
       child: Center(
         child: Icon(
           icon,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
+          color: Theme.of(context).colorScheme.onSurface
+              .withValues(alpha: 0.35),
           size: 32,
         ),
       ),

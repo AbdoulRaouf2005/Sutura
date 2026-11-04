@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/repositories/client_repository.dart';
 import '../../../core/repositories/measurement_repository.dart';
 import '../../../core/repositories/order_repository.dart';
+import '../../../core/state/data_controller.dart';
+import '../../../core/state/data_events_listener.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/formatters/formatters.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
@@ -24,7 +26,8 @@ class ClientDetailScreen extends StatefulWidget {
   State<ClientDetailScreen> createState() => _ClientDetailScreenState();
 }
 
-class _ClientDetailScreenState extends State<ClientDetailScreen> {
+class _ClientDetailScreenState extends State<ClientDetailScreen>
+    with DataEventsListener<ClientDetailScreen> {
   final ClientRepository _clients = ClientRepository();
   final OrderRepository _orders = OrderRepository();
   final MeasurementRepository _measurements = MeasurementRepository();
@@ -32,10 +35,20 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
   Future<_ClientDetailData>? _future;
 
   @override
+  Set<DataEntity> get dataEntities => const <DataEntity>{
+        DataEntity.clients,
+        DataEntity.orders,
+        DataEntity.measurements,
+      };
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
+
+  @override
+  void onDataChanged() => _load();
 
   void _load() {
     setState(() {
@@ -85,10 +98,7 @@ class _ClientDetailScreenState extends State<ClientDetailScreen> {
                 onSelected: (String value) async {
                   switch (value) {
                     case 'edit':
-                      final bool? changed = await context.push<bool>(
-                        '/clients/${client.id}/modifier',
-                      );
-                      if (changed == true) _load();
+                      await context.push('/clients/${client.id}/modifier');
                     case 'archive':
                       await _archive(client);
                   }

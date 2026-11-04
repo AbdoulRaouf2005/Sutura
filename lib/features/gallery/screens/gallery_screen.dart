@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/repositories/garment_model_repository.dart';
+import '../../../core/state/data_controller.dart';
+import '../../../core/state/data_events_listener.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/local_image.dart';
 import '../models/garment_model.dart';
+import 'gallery_preview_screen.dart';
 
 /// Galerie de modèles : grille de photos, recherche par nom, filtre par
 /// catégorie (§4.4).
+///
+/// La grille privilégie les photos pour donner un aperçu rapide de tous les
+/// modèles. Un appui ouvre un aperçu plein écran qui permet de faire défiler
+/// les modèles sans quitter la galerie.
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
 
@@ -16,12 +23,16 @@ class GalleryScreen extends StatefulWidget {
   State<GalleryScreen> createState() => _GalleryScreenState();
 }
 
-class _GalleryScreenState extends State<GalleryScreen> {
+class _GalleryScreenState extends State<GalleryScreen>
+    with DataEventsListener<GalleryScreen> {
   final GarmentModelRepository _repo = GarmentModelRepository();
   final TextEditingController _search = TextEditingController();
 
   Future<List<GarmentModel>>? _future;
   String? _category;
+
+  @override
+  Set<DataEntity> get dataEntities => const <DataEntity>{DataEntity.models};
 
   @override
   void initState() {
@@ -35,10 +46,31 @@ class _GalleryScreenState extends State<GalleryScreen> {
     super.dispose();
   }
 
+  @override
+  void onDataChanged() => _load();
+
   void _load() {
     setState(() {
       _future = _repo.list(query: _search.text, category: _category);
     });
+  }
+
+  Future<void> _openPreview(List<GarmentModel> models, int index) async {
+    final String? editId = await Navigator.of(context).push<String>(
+      PageRouteBuilder<String>(
+        pageBuilder: (_, _, _) =>
+            GalleryPreviewScreen(models: models, initialIndex: index),
+        transitionsBuilder: (_, Animation<double> animation, _, Widget child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 200),
+      ),
+    );
+    if (!mounted || editId == null) return;
+    await context.push('/galerie/$editId/modifier');
   }
 
   @override
@@ -46,10 +78,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Galerie de modèles')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final bool? changed = await context.push<bool>('/galerie/nouveau');
-          if (changed == true) _load();
-        },
+        onPressed: () => context.push('/galerie/nouveau'),
         icon: const Icon(Icons.add_a_photo_outlined),
         label: const Text('Ajouter'),
       ),
@@ -83,70 +112,116 @@ class _GalleryScreenState extends State<GalleryScreen> {
           Expanded(
             child: FutureBuilder<List<GarmentModel>>(
               future: _future,
-              builder: (BuildContext context,
-                  AsyncSnapshot<List<GarmentModel>> snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return ErrorState(
-                    message: 'Impossible de charger la galerie.',
-                    onRetry: _load,
-                  );
-                }
-                final List<GarmentModel> models =
-                    snapshot.data ?? <GarmentModel>[];
-                if (models.isEmpty) {
-                  final bool filtered =
-                      _search.text.trim().isNotEmpty || _category != null;
-                  return EmptyState(
-                    icon: Icons.photo_library_outlined,
-                    message: filtered
-                        ? 'Aucun modèle ne correspond à votre recherche.'
-                        : 'Votre galerie est vide. Ajoutez une photo de modèle '
-                            'pour la retrouver facilement lors d\'une commande.',
-                    actionLabel: filtered ? null : 'Ajouter un modèle',
-                    onAction: filtered
-                        ? null
-                        : () async {
-                            final bool? changed =
-                                await context.push<bool>('/galerie/nouveau');
-                            if (changed == true) _load();
-                          },
-                  );
-                }
-                return GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg,
-                    0,
-                    AppSpacing.lg,
-                    AppSpacing.xxl * 2,
-                  ),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: AppSpacing.md,
-                    mainAxisSpacing: AppSpacing.md,
-                    childAspectRatio: 0.78,
-                  ),
-                  itemCount: models.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    final GarmentModel model = models[index];
-                    return _ModelTile(
-                      model: model,
-                      onTap: () async {
-                        final bool? changed = await context
-                            .push<bool>('/galerie/${model.id}/modifier');
-                        if (changed == true) _load();
-                      },
+              builder:
+                  (
+                    BuildContext context,
+                    AsyncSnapshot<List<GarmentModel>> snapshot,
+                  ) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return ErrorState(
+                        message: 'Impossible de charger la galerie.',
+                        onRetry: _load,
+                      );
+                    }
+                    final List<GarmentModel> models =
+                        snapshot.data ?? <GarmentModel>[];
+                    if (models.isEmpty) {
+                      final bool filtered =
+                          _search.text.trim().isNotEmpty || _category != null;
+                      return EmptyState(
+                        icon: Icons.photo_library_outlined,
+                        message: filtered
+                            ? 'Aucun modèle ne correspond à votre recherche.'
+                            : 'Votre galerie est vide. Ajoutez une photo de modèle '
+                                  'pour la retrouver facilement lors d\'une commande.',
+                        actionLabel: filtered ? null : 'Ajouter un modèle',
+                        onAction: filtered
+                            ? null
+                            : () => context.push('/galerie/nouveau'),
+                      );
+                    }
+                    return _GalleryGrid(
+                      models: models,
+                      onOpen: (int index) => _openPreview(models, index),
                     );
                   },
-                );
-              },
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _GalleryGrid extends StatelessWidget {
+  const _GalleryGrid({required this.models, required this.onOpen});
+
+  final List<GarmentModel> models;
+  final ValueChanged<int> onOpen;
+
+  int _columnsFor(double width) {
+    if (width >= 1000) return 5;
+    if (width >= 760) return 4;
+    if (width >= 560) return 3;
+    return 2;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final int columns = _columnsFor(constraints.maxWidth);
+        return CustomScrollView(
+          slivers: <Widget>[
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  models.length == 1 ? '1 modèle' : '${models.length} modèles',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurface
+                        .withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.xxl * 2,
+              ),
+              sliver: SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: AppSpacing.sm,
+                  mainAxisSpacing: AppSpacing.sm,
+                  childAspectRatio: 3 / 4,
+                ),
+                delegate: SliverChildBuilderDelegate((
+                  BuildContext context,
+                  int index,
+                ) {
+                  return _ModelTile(
+                    model: models[index],
+                    onTap: () => onOpen(index),
+                  );
+                }, childCount: models.length),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -199,46 +274,57 @@ class _ModelTile extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
+          fit: StackFit.expand,
           children: <Widget>[
-            Expanded(
-              child: SizedBox(
-                width: double.infinity,
-                child: LocalImage(
-                  path: model.localImagePath,
-                  label: model.name,
-                ),
-              ),
+            LocalImage(
+              path: model.localImagePath,
+              label: model.name,
+              cacheWidth: 700,
             ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    model.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.sm,
+                  AppSpacing.xl,
+                  AppSpacing.sm,
+                  AppSpacing.sm,
+                ),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[Colors.transparent, Colors.black87],
                   ),
-                  if (model.category != null) ...<Widget>[
-                    const SizedBox(height: AppSpacing.xs),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
                     Text(
-                      model.category!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.6),
+                      model.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (model.category != null)
+                      Text(
+                        model.category!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                      ),
                   ],
-                ],
+                ),
               ),
             ),
           ],

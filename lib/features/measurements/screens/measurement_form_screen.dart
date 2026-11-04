@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/repositories/measurement_repository.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_semantic_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/id_generator.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
@@ -332,7 +332,7 @@ class _MeasurementRow extends StatelessWidget {
           onPressed: onRemove,
           icon: const Icon(Icons.close),
           tooltip: 'Retirer ${field.name}',
-          color: AppColors.textSecondary,
+          color: AppSemanticColors.of(context).onSurfaceMuted,
         ),
       ],
     );

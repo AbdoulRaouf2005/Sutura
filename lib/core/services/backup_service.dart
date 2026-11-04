@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../database/app_database.dart';
+import '../state/data_controller.dart';
 
 /// Sauvegarde et restauration de la base SQLite et des photos locales.
 ///
@@ -156,6 +157,8 @@ class BackupService {
 
       // Rouvre la base
       await AppDatabase.instance.database;
+      // Les écrans affichent des données périmées : on les rafraîchit tous.
+      DataController.instance.notifyAll();
       return dbRestored;
     } catch (_) {
       // Tente de rouvrir la base même en cas d'erreur partielle

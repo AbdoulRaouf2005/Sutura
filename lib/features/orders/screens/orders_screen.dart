@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/repositories/client_repository.dart';
 import '../../../core/repositories/order_repository.dart';
+import '../../../core/state/data_controller.dart';
+import '../../../core/state/data_events_listener.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/formatters/formatters.dart';
 import '../../../shared/widgets/empty_state.dart';
@@ -10,8 +11,6 @@ import '../../../shared/widgets/status_badge.dart';
 import '../models/order.dart';
 
 /// Liste des commandes et suivi des échéances (cahier des charges §4.5).
-///
-/// Les formulaires de création/modification seront ajoutés à l'étape suivante.
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
 
@@ -19,13 +18,18 @@ class OrdersScreen extends StatefulWidget {
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> {
+class _OrdersScreenState extends State<OrdersScreen>
+    with DataEventsListener<OrdersScreen> {
   final OrderRepository _orders = OrderRepository();
-  final ClientRepository _clients = ClientRepository();
 
-  Future<List<Order>>? _future;
-  final Map<String, String> _clientNames = <String, String>{};
+  Future<List<OrderWithClient>>? _future;
   OrderStatus? _filter;
+
+  @override
+  Set<DataEntity> get dataEntities => const <DataEntity>{
+        DataEntity.orders,
+        DataEntity.clients,
+      };
 
   @override
   void initState() {
@@ -33,21 +37,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
     _load();
   }
 
+  @override
+  void onDataChanged() => _load();
+
   void _load() {
     setState(() {
       _future = _fetch();
     });
   }
 
-  Future<List<Order>> _fetch() async {
-    final List<Order> orders = await _orders.list(status: _filter);
-    for (final Order order in orders) {
-      if (!_clientNames.containsKey(order.clientId)) {
-        final client = await _clients.findById(order.clientId);
-        _clientNames[order.clientId] = client?.fullName ?? 'Client inconnu';
-      }
-    }
-    return orders;
+  Future<List<OrderWithClient>> _fetch() async {
+    return _orders.listWithClientNames(status: _filter);
   }
 
   @override
@@ -55,10 +55,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Commandes')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final bool? changed = await context.push<bool>('/commandes/nouvelle');
-          if (changed == true) _load();
-        },
+        onPressed: () => context.push('/commandes/nouvelle'),
         icon: const Icon(Icons.note_add_outlined),
         label: const Text('Nouvelle'),
       ),
@@ -72,10 +69,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
             },
           ),
           Expanded(
-            child: FutureBuilder<List<Order>>(
+            child: FutureBuilder<List<OrderWithClient>>(
               future: _future,
               builder: (BuildContext context,
-                  AsyncSnapshot<List<Order>> snapshot) {
+                  AsyncSnapshot<List<OrderWithClient>> snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -85,7 +82,8 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     onRetry: _load,
                   );
                 }
-                final List<Order> orders = snapshot.data ?? <Order>[];
+                final List<OrderWithClient> orders =
+                    snapshot.data ?? <OrderWithClient>[];
                 if (orders.isEmpty) {
                   return EmptyState(
                     icon: Icons.assignment_outlined,
@@ -108,16 +106,12 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   separatorBuilder: (_, _) =>
                       const SizedBox(height: AppSpacing.sm),
                   itemBuilder: (BuildContext context, int index) {
-                    final Order order = orders[index];
+                    final OrderWithClient entry = orders[index];
+                    final Order order = entry.order;
                     return _OrderCard(
                       order: order,
-                      clientName:
-                          _clientNames[order.clientId] ?? 'Client inconnu',
-                      onTap: () async {
-                        final bool? changed = await context
-                            .push<bool>('/commandes/${order.id}');
-                        if (changed == true) _load();
-                      },
+                      clientName: entry.clientName,
+                      onTap: () => context.push('/commandes/${order.id}'),
                     );
                   },
                 );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_semantic_colors.dart';
 import 'app_spacing.dart';
 
 /// Thème centralisé de Sutura — Material 3, clair par défaut.
@@ -28,6 +29,9 @@ abstract final class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
+      extensions: <ThemeExtension<dynamic>>[
+        isDark ? AppSemanticColors.dark : AppSemanticColors.light,
+      ],
       scaffoldBackgroundColor:
           isDark ? AppColors.darkBackground : AppColors.background,
       textTheme: baseText.apply(

@@ -146,6 +146,16 @@ ThemeData buildAppTheme() {
 
 Dans `main.dart`, appliquer le thème avec `theme: buildAppTheme()`.
 
+### 2.1 Thème clair / sombre
+
+Le mode sombre est une variante du même thème Material 3, pas une seconde identité visuelle :
+
+- `AppTheme.light` et `AppTheme.dark` partagent la même structure (mêmes composants, mêmes rayons, mêmes espacements) et ne diffèrent que par les couleurs ;
+- `AppTheme.dark` utilise les fonds sombres de `AppColors` (`darkBackground`, `darkSurface`, `darkTextPrimary`) et l'or africain comme couleur d'action, lisible sur fond sombre ;
+- les couleurs sémantiques (succès, avertissement, erreur, texte secondaire) sont exposees par l'extension de thème `AppSemanticColors`, qui fournit des variantes lisibles en mode sombre — les utiliser plutôt que `AppColors.success`, `AppColors.error` ou `AppColors.textSecondary` dans les écrans ;
+- le mode courant est géré par `ThemeController` (clair, sombre ou système), mémorisé avec `shared_preferences` et exposé dans l'écran Réglages ;
+- le thème clair reste la valeur par défaut de la V1.
+
 ---
 
 ## 3. Logo et icône de l’application
@@ -226,7 +236,9 @@ sutura/
 │   │   │   └── database_migrations.dart
 │   │   ├── theme/
 │   │   │   ├── app_colors.dart
-│   │   │   └── app_theme.dart
+│   │   │   ├── app_semantic_colors.dart
+│   │   │   ├── app_theme.dart
+│   │   │   └── theme_controller.dart
 │   │   └── utils/
 │   ├── features/
 │   │   ├── dashboard/

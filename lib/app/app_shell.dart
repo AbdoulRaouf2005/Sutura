@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/theme/app_colors.dart';
-
 /// Coquille principale avec barre de navigation inférieure à quatre
 /// destinations (guide §6).
 class AppShell extends StatelessWidget {
@@ -51,14 +49,16 @@ class AppShell extends StatelessWidget {
           ),
           backgroundColor: Theme.of(context).colorScheme.surface,
           surfaceTintColor: Colors.transparent,
-          indicatorColor: AppColors.primary.withValues(alpha: 0.12),
+          indicatorColor:
+              Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
           height: 64,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           destinations: _destinations
               .map(
                 (d) => NavigationDestination(
                   icon: Icon(d.icon),
-                  selectedIcon: Icon(d.activeIcon, color: AppColors.primary),
+                  selectedIcon:
+                      Icon(d.activeIcon, color: Theme.of(context).colorScheme.primary),
                   label: d.label,
                 ),
               )

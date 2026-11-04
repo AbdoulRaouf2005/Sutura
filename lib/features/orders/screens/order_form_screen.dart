@@ -6,6 +6,8 @@ import '../../../core/repositories/client_repository.dart';
 import '../../../core/repositories/garment_model_repository.dart';
 import '../../../core/repositories/measurement_repository.dart';
 import '../../../core/repositories/order_repository.dart';
+import '../../../core/state/data_controller.dart';
+import '../../../core/state/data_events_listener.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/id_generator.dart';
 import '../../../shared/formatters/formatters.dart';
@@ -37,7 +39,8 @@ class OrderFormScreen extends StatefulWidget {
   State<OrderFormScreen> createState() => _OrderFormScreenState();
 }
 
-class _OrderFormScreenState extends State<OrderFormScreen> {
+class _OrderFormScreenState extends State<OrderFormScreen>
+    with DataEventsListener<OrderFormScreen> {
   final ClientRepository _clients = ClientRepository();
   final GarmentModelRepository _models = GarmentModelRepository();
   final MeasurementRepository _measurements = MeasurementRepository();
@@ -58,10 +61,27 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   DateTime _deliveryAt = DateTime.now().add(const Duration(days: 7));
   bool _saving = false;
 
+  /// Le formulaire n'est pré-rempli qu'une fois : un rafraîchissement des
+  /// listes (client ajouté, modèle modifié) ne doit pas écraser la saisie.
+  bool _initialized = false;
+
+  @override
+  Set<DataEntity> get dataEntities => const <DataEntity>{
+        DataEntity.clients,
+        DataEntity.models,
+      };
+
   @override
   void initState() {
     super.initState();
     _future = _loadOptions();
+  }
+
+  @override
+  void onDataChanged() {
+    setState(() {
+      _future = _loadOptions();
+    });
   }
 
   @override
@@ -77,22 +97,31 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     final List<Client> clients = await _clients.list();
     final List<GarmentModel> models = await _models.list();
 
+    if (!_initialized) {
+      await _fillFromExisting();
+      _initialized = true;
+    }
+
+    return _OrderFormData(clients: clients, models: models);
+  }
+
+  /// Reprend les valeurs de la commande modifiée (ou le client présélectionné)
+  /// au premier chargement uniquement.
+  Future<void> _fillFromExisting() async {
     if (widget.isEditing) {
       final Order? order = await _orders.findById(widget.orderId!);
       if (order == null) {
         throw StateError('Commande introuvable');
       }
       _existing = order;
-      _client = clients.firstWhere(
-        (Client c) => c.id == order.clientId,
-        orElse: () => Client(
-          id: order.clientId,
-          fullName: 'Client inconnu',
-          createdAt: order.createdAt,
-          updatedAt: order.updatedAt,
-          isArchived: true,
-        ),
-      );
+      _client = await _clients.findById(order.clientId) ??
+          Client(
+            id: order.clientId,
+            fullName: 'Client inconnu',
+            createdAt: order.createdAt,
+            updatedAt: order.updatedAt,
+            isArchived: true,
+          );
       if (order.garmentModelId != null) {
         // Le modèle peut avoir été archivé : on le cherche sans filtre.
         _model = await _models.findById(order.garmentModelId!);
@@ -109,8 +138,6 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     } else if (widget.preselectedClientId != null) {
       _client = await _clients.findById(widget.preselectedClientId!);
     }
-
-    return _OrderFormData(clients: clients, models: models);
   }
 
   Future<void> _selectClient() async {
@@ -282,11 +309,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
           }
           if (snapshot.data!.clients.isEmpty) {
             return _NeedClient(
-              onAdd: () async {
-                await context.push<bool>('/clients/nouveau');
-                if (!mounted) return;
-                setState(() => _future = _loadOptions());
-              },
+              onAdd: () => context.push('/clients/nouveau'),
             );
           }
           return Form(

@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/state/data_controller.dart';
 import '../../features/gallery/models/garment_model.dart';
 
 /// Accès aux modèles de la galerie (table `garment_models`).
@@ -58,6 +59,7 @@ class GarmentModelRepository {
       model.toMap(),
       conflictAlgorithm: ConflictAlgorithm.abort,
     );
+    DataController.instance.notify(DataEntity.models);
   }
 
   Future<void> update(GarmentModel model) async {
@@ -68,6 +70,7 @@ class GarmentModelRepository {
       where: 'id = ?',
       whereArgs: <Object?>[model.id],
     );
+    DataController.instance.notify(DataEntity.models);
   }
 
   Future<int> countActive() async {

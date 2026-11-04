@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/repositories/garment_model_repository.dart';
 import '../../../core/storage/local_image_storage.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_semantic_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/id_generator.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
@@ -90,7 +90,10 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
             ),
             if (_imagePath != null)
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                leading: Icon(
+                  Icons.delete_outline,
+                  color: AppSemanticColors.of(ctx).error,
+                ),
                 title: const Text('Retirer la photo'),
                 onTap: () => Navigator.of(ctx).pop('remove'),
               ),

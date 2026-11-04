@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/state/data_controller.dart';
 import '../../features/clients/models/client.dart';
 
 /// Accès aux données des clients (table `clients`).
@@ -55,6 +56,7 @@ class ClientRepository {
       client.toMap(),
       conflictAlgorithm: ConflictAlgorithm.abort,
     );
+    DataController.instance.notify(DataEntity.clients);
   }
 
   Future<void> update(Client client) async {
@@ -65,6 +67,7 @@ class ClientRepository {
       where: 'id = ?',
       whereArgs: <Object?>[client.id],
     );
+    DataController.instance.notify(DataEntity.clients);
   }
 
   /// Nombre total de clients actifs (non archivés).

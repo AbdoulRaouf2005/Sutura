@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_semantic_colors.dart';
 
 /// Affiche une boîte de dialogue de confirmation pour une action destructive
 /// (cahier des charges §4.2 et guide §9).
@@ -27,7 +27,9 @@ Future<bool> confirmAction(
           ),
           FilledButton(
             style: destructive
-                ? FilledButton.styleFrom(backgroundColor: AppColors.error)
+                ? FilledButton.styleFrom(
+                    backgroundColor: AppSemanticColors.of(ctx).error,
+                  )
                 : null,
             onPressed: () => Navigator.of(ctx).pop(true),
             child: Text(confirmLabel),
@@ -50,7 +52,7 @@ void showAppSnackBar(
     ..showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? AppColors.error : null,
+        backgroundColor: isError ? AppSemanticColors.of(context).error : null,
       ),
     );
 }

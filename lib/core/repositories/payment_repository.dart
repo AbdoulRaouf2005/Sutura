@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/database/app_database.dart';
+import '../../core/state/data_controller.dart';
 import '../../features/payments/models/payment.dart';
 
 /// Accès aux paiements (table `payments`).
@@ -28,11 +29,13 @@ class PaymentRepository {
       payment.toMap(),
       conflictAlgorithm: ConflictAlgorithm.abort,
     );
+    DataController.instance.notify(DataEntity.payments);
   }
 
   Future<void> delete(String id) async {
     final db = await _db.database;
     await db.delete('payments', where: 'id = ?', whereArgs: <Object?>[id]);
+    DataController.instance.notify(DataEntity.payments);
   }
 
   /// Somme des paiements d'une commande.

@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/repositories/client_repository.dart';
+import '../../../core/state/data_controller.dart';
+import '../../../core/state/data_events_listener.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../models/client.dart';
 
 /// Liste, recherche et accès aux fiches clients (cahier des charges §4.2).
-///
-/// Les formulaires de la fiche client seront ajoutés à l'étape suivante.
 class ClientsScreen extends StatefulWidget {
   const ClientsScreen({super.key});
 
@@ -16,11 +16,15 @@ class ClientsScreen extends StatefulWidget {
   State<ClientsScreen> createState() => _ClientsScreenState();
 }
 
-class _ClientsScreenState extends State<ClientsScreen> {
+class _ClientsScreenState extends State<ClientsScreen>
+    with DataEventsListener<ClientsScreen> {
   final ClientRepository _repo = ClientRepository();
   final TextEditingController _search = TextEditingController();
 
   Future<List<Client>>? _future;
+
+  @override
+  Set<DataEntity> get dataEntities => const <DataEntity>{DataEntity.clients};
 
   @override
   void initState() {
@@ -34,6 +38,9 @@ class _ClientsScreenState extends State<ClientsScreen> {
     super.dispose();
   }
 
+  @override
+  void onDataChanged() => _load();
+
   void _load() {
     setState(() {
       _future = _repo.list(query: _search.text);
@@ -45,10 +52,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Clients')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final bool? changed = await context.push<bool>('/clients/nouveau');
-          if (changed == true) _load();
-        },
+        onPressed: () => context.push('/clients/nouveau'),
         icon: const Icon(Icons.person_add_alt),
         label: const Text('Ajouter'),
       ),
@@ -97,11 +101,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                     actionLabel:
                         _search.text.trim().isEmpty ? 'Ajouter un client' : null,
                     onAction: _search.text.trim().isEmpty
-                        ? () async {
-                            final bool? changed =
-                                await context.push<bool>('/clients/nouveau');
-                            if (changed == true) _load();
-                          }
+                        ? () => context.push('/clients/nouveau')
                         : null,
                   );
                 }
@@ -129,11 +129,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                             ? null
                             : Text(client.phone!),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () async {
-                          final bool? changed = await context
-                              .push<bool>('/clients/${client.id}');
-                          if (changed == true) _load();
-                        },
+                        onTap: () => context.push('/clients/${client.id}'),
                       ),
                     );
                   },

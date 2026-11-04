@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../../../core/repositories/order_repository.dart';
 import '../../../core/repositories/payment_repository.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/state/data_controller.dart';
+import '../../../core/state/data_events_listener.dart';
+import '../../../core/theme/app_semantic_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/id_generator.dart';
 import '../../../shared/formatters/formatters.dart';
@@ -23,7 +25,8 @@ class PaymentsScreen extends StatefulWidget {
   State<PaymentsScreen> createState() => _PaymentsScreenState();
 }
 
-class _PaymentsScreenState extends State<PaymentsScreen> {
+class _PaymentsScreenState extends State<PaymentsScreen>
+    with DataEventsListener<PaymentsScreen> {
   final PaymentRepository _payments = PaymentRepository();
   final OrderRepository _orders = OrderRepository();
 
@@ -31,10 +34,19 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   bool _changed = false;
 
   @override
+  Set<DataEntity> get dataEntities => const <DataEntity>{
+        DataEntity.payments,
+        DataEntity.orders,
+      };
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
+
+  @override
+  void onDataChanged() => _load();
 
   void _load() {
     setState(() {
@@ -69,7 +81,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     );
     if (added == true) {
       _changed = true;
-      _load();
     }
   }
 
@@ -85,7 +96,6 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
     await _payments.delete(payment.id);
     if (!mounted) return;
     _changed = true;
-    _load();
   }
 
   @override
@@ -186,7 +196,7 @@ class _BalanceSummary extends StatelessWidget {
                   context,
                   'Total payé',
                   Formatters.money(balance.totalPaid),
-                  AppColors.success,
+                  AppSemanticColors.of(context).success,
                 ),
               ),
               Container(
@@ -204,10 +214,10 @@ class _BalanceSummary extends StatelessWidget {
                         : balance.remaining,
                   ),
                   balance.isSettled
-                      ? AppColors.success
+                      ? AppSemanticColors.of(context).success
                       : (balance.isOverpaid
                           ? Theme.of(context).colorScheme.primary
-                          : AppColors.warning),
+                          : AppSemanticColors.of(context).warning),
                 ),
               ),
             ],
