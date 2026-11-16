@@ -21,14 +21,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _export() async {
     setState(() => _exporting = true);
-    final bool ok = await BackupService.instance.shareBackup();
+    final BackupResult result = await BackupService.instance.shareBackup();
     if (!mounted) return;
     setState(() => _exporting = false);
+    if (result == BackupResult.cancelled) return;
+    final bool ok = result == BackupResult.success;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok
-            ? 'Sauvegarde partagée / enregistrée.'
-            : 'L\'export de la sauvegarde a échoué.'),
+        content: Text(
+          ok
+              ? 'Sauvegarde partagée / enregistrée.'
+              : 'L\'export de la sauvegarde a échoué.',
+        ),
         backgroundColor: ok ? null : AppSemanticColors.of(context).error,
       ),
     );
@@ -38,7 +42,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final bool confirmed = await confirmAction(
       context,
       title: 'Restaurer une sauvegarde ?',
-      message: 'Toutes les données actuelles seront remplacées par celles '
+      message:
+          'Toutes les données actuelles seront remplacées par celles '
           'de la sauvegarde. Cette action est irréversible.',
       confirmLabel: 'Restaurer',
       destructive: true,
@@ -46,15 +51,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!confirmed) return;
 
     setState(() => _restoring = true);
-    final bool ok = await BackupService.instance.restoreFromPicker();
+    final BackupResult result = await BackupService.instance
+        .restoreFromPicker();
     if (!mounted) return;
     setState(() => _restoring = false);
+    if (result == BackupResult.cancelled) return;
+    final bool ok = result == BackupResult.success;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(ok
-            ? 'Sauvegarde restaurée. L\'application peut nécessiter un '
-                'redémarrage pour un affichage optimal.'
-            : 'La restauration a échoué. Vérifiez le fichier zip.'),
+        content: Text(
+          ok
+              ? 'Sauvegarde restaurée. L\'application peut nécessiter un '
+                    'redémarrage pour un affichage optimal.'
+              : 'La restauration a échoué. Vérifiez le fichier zip.',
+        ),
         backgroundColor: ok ? null : AppSemanticColors.of(context).error,
       ),
     );
@@ -111,7 +121,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.backup_outlined),
                   title: const Text('Sauvegarder mes données'),
                   subtitle: const Text(
-                      'Exporte la base et toutes les photos dans un fichier zip.'),
+                    'Exporte la base et toutes les photos dans un fichier zip.',
+                  ),
                   trailing: _exporting
                       ? const SizedBox(
                           width: 24,
@@ -126,7 +137,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: const Icon(Icons.restore_outlined),
                   title: const Text('Restaurer une sauvegarde'),
                   subtitle: const Text(
-                      'Remplace toutes les données actuelles par le fichier zip sélectionné.'),
+                    'Remplace toutes les données actuelles par le fichier zip sélectionné.',
+                  ),
                   trailing: _restoring
                       ? const SizedBox(
                           width: 24,
@@ -143,7 +155,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Container(
             padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
-              color: AppSemanticColors.of(context).warning.withValues(alpha: 0.10),
+              color: AppSemanticColors.of(context).warning
+                  .withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
             ),
             child: Row(
@@ -216,9 +229,7 @@ class _ThemeSelector extends StatelessWidget {
               'de votre appareil.',
               style: TextStyle(
                 fontSize: 13,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
+                color: Theme.of(context).colorScheme.onSurface
                     .withValues(alpha: 0.6),
               ),
             ),
@@ -282,7 +293,8 @@ class _ThemeToggleButton extends StatelessWidget {
       listenable: ThemeController.instance,
       builder: (BuildContext context, Widget? child) {
         final ThemeMode mode = ThemeController.instance.themeMode;
-        final bool isDark = mode == ThemeMode.dark ||
+        final bool isDark =
+            mode == ThemeMode.dark ||
             (mode == ThemeMode.system &&
                 MediaQuery.platformBrightnessOf(context) == Brightness.dark);
         return IconButton(
@@ -301,4 +313,3 @@ class _ThemeToggleButton extends StatelessWidget {
     );
   }
 }
-

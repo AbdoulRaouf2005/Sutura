@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:archive/archive_io.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -10,6 +11,9 @@ import 'package:sqflite/sqflite.dart';
 
 import '../database/app_database.dart';
 import '../state/data_controller.dart';
+
+/// Résultat d'une opération de sauvegarde ou de restauration.
+enum BackupResult { success, cancelled, failed }
 
 /// Sauvegarde et restauration de la base SQLite et des photos locales.
 ///
@@ -24,41 +28,53 @@ class BackupService {
   static const String _dbFileName = 'sutura.db';
   static const String _imagesFolder = 'garment_images';
 
+  static const List<int> _sqliteHeader = <int>[
+    0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, // "SQLite"
+    0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00, // " format 3\0"
+  ];
+
   /// Exporte la base et les images dans un fichier zip.
   /// Retourne le chemin du fichier créé, ou `null` en cas d'échec.
   Future<String?> exportBackup() async {
     try {
       final Database db = await AppDatabase.instance.database;
-      // S'assure que toutes les écritures en attente sont flushées.
-      await db.execute('PRAGMA wal_checkpoint(TRUNCATE)');
 
-      final String dbPath = p.join(await getDatabasesPath(), _dbFileName);
-      final File dbFile = File(dbPath);
-      if (!await dbFile.exists()) throw StateError('Base introuvable');
+      // Force l'écriture des transactions en attente dans le fichier principal.
+      // `rawQuery` est utilisé car un PRAGMA renvoie des lignes et échoue avec
+      // `execute` (execSQL) sur Android.
+      try {
+        await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE)');
+      } catch (error) {
+        debugPrint('Checkpoint WAL impossible (ignoré) : $error');
+      }
+
+      final File dbFile = File(db.path);
+      if (!await dbFile.exists()) {
+        throw StateError('Fichier de base introuvable : ${db.path}');
+      }
+
+      final Uint8List dbBytes = await dbFile.readAsBytes();
+      if (!_isSqliteFile(dbBytes)) {
+        throw StateError('Le fichier de base est invalide');
+      }
 
       final Directory docs = await getApplicationDocumentsDirectory();
       final Directory imagesDir = Directory(p.join(docs.path, _imagesFolder));
 
       final Directory tempDir = await getTemporaryDirectory();
-      final String timestamp =
-          DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final String timestamp = DateFormat('yyyyMMdd_HHmmss')
+          .format(DateTime.now());
       final String zipName = 'sutura_backup_$timestamp.zip';
       final String zipPath = p.join(tempDir.path, zipName);
 
       final Archive archive = Archive();
+      archive.addFile(ArchiveFile(_dbFileName, dbBytes.length, dbBytes));
 
-      // Ajoute la base
-      final List<int> dbBytes = await dbFile.readAsBytes();
-      archive.addFile(
-        ArchiveFile(_dbFileName, dbBytes.length, dbBytes),
-      );
-
-      // Ajoute les images si elles existent
       if (await imagesDir.exists()) {
         await for (final FileSystemEntity entity in imagesDir.list()) {
           if (entity is File) {
             final String name = p.basename(entity.path);
-            final List<int> bytes = await entity.readAsBytes();
+            final Uint8List bytes = await entity.readAsBytes();
             archive.addFile(
               ArchiveFile(p.join(_imagesFolder, name), bytes.length, bytes),
             );
@@ -67,105 +83,221 @@ class BackupService {
       }
 
       final List<int> zipBytes = ZipEncoder().encode(archive);
-      final File zipFile = File(zipPath);
-      await zipFile.writeAsBytes(zipBytes);
+      await File(zipPath).writeAsBytes(zipBytes, flush: true);
 
       return zipPath;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('Échec de l\'export de sauvegarde : $error\n$stackTrace');
       return null;
     }
   }
 
   /// Partage le fichier de sauvegarde avec l'application de partage système.
-  Future<bool> shareBackup() async {
+  Future<BackupResult> shareBackup() async {
     final String? zipPath = await exportBackup();
-    if (zipPath == null) return false;
+    if (zipPath == null) return BackupResult.failed;
     try {
       final XFile file = XFile(zipPath, mimeType: 'application/zip');
-      final ShareResult result = await Share.shareXFiles(
-        <XFile>[file],
-        subject: 'Sauvegarde Sutura',
-      );
-      return result.status == ShareResultStatus.success;
-    } catch (_) {
-      return false;
+      final ShareResult result = await Share.shareXFiles(<XFile>[
+        file,
+      ], subject: 'Sauvegarde Sutura');
+      if (result.status == ShareResultStatus.dismissed) {
+        return BackupResult.cancelled;
+      }
+      return BackupResult.success;
+    } catch (error, stackTrace) {
+      debugPrint('Échec du partage de sauvegarde : $error\n$stackTrace');
+      return BackupResult.failed;
     }
   }
 
   /// Restaure la base et les images depuis un fichier zip sélectionné.
-  /// Ferme la base avant de remplacer les fichiers. À utiliser avec
-  /// précaution : cette opération remplace les données actuelles.
-  Future<bool> restoreFromPicker() async {
+  ///
+  /// Le contenu du zip est validé avant de toucher aux données actuelles. En
+  /// cas d'échec pendant le remplacement, les données précédentes sont
+  /// restaurées à partir d'une copie de secours.
+  Future<BackupResult> restoreFromPicker() async {
+    FilePickerResult? picked;
     try {
-      final FilePickerResult? picked = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: <String>['zip'],
+      // `FileType.any` plutôt que `FileType.custom` : sur Android, le filtre
+      // par extension MIME masque souvent les fichiers .zip exportés par
+      // l'application. La validité du fichier est vérifiée plus bas.
+      picked = await FilePicker.platform.pickFiles(
+        type: FileType.any,
         allowMultiple: false,
       );
-      if (picked == null || picked.files.isEmpty) return false;
+    } catch (error, stackTrace) {
+      debugPrint('Échec du sélecteur de fichier : $error\n$stackTrace');
+      return BackupResult.failed;
+    }
+    if (picked == null || picked.files.isEmpty) {
+      return BackupResult.cancelled;
+    }
 
-      final String? sourcePath = picked.files.single.path;
-      if (sourcePath == null) return false;
+    final String? sourcePath = picked.files.single.path;
+    if (sourcePath == null) {
+      debugPrint('Restauration impossible : chemin du fichier indisponible');
+      return BackupResult.failed;
+    }
 
-      // Ferme la connexion SQLite avant de remplacer le fichier.
-      await AppDatabase.instance.close();
-
-      final Directory docs = await getApplicationDocumentsDirectory();
-      final Directory imagesDir = Directory(p.join(docs.path, _imagesFolder));
-      final String dbPath = p.join(await getDatabasesPath(), _dbFileName);
-
-      // Décompresse
+    // Lit et valide l'archive AVANT de supprimer les données actuelles.
+    Uint8List? newDbBytes;
+    final Map<String, Uint8List> restoredImages = <String, Uint8List>{};
+    try {
       final List<int> zipBytes = await File(sourcePath).readAsBytes();
       final Archive archive = ZipDecoder().decodeBytes(zipBytes);
+      for (final ArchiveFile file in archive) {
+        if (!file.isFile) continue;
+        final String name = file.name.replaceAll('\\', '/');
+        final List<int> data = file.content as List<int>;
+        if (name == _dbFileName || name.endsWith('/$_dbFileName')) {
+          newDbBytes = Uint8List.fromList(data);
+        } else if (name.startsWith('$_imagesFolder/') && !name.endsWith('/')) {
+          final String imageName = p.basename(name);
+          if (imageName.isNotEmpty) {
+            restoredImages[imageName] = Uint8List.fromList(data);
+          }
+        }
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Archive de sauvegarde illisible : $error\n$stackTrace');
+      return BackupResult.failed;
+    }
 
-      // Supprime le dossier images existant
+    if (newDbBytes == null || !_isSqliteFile(newDbBytes)) {
+      debugPrint('L\'archive ne contient pas de base SQLite valide');
+      return BackupResult.failed;
+    }
+
+    final Directory docs = await getApplicationDocumentsDirectory();
+    final Directory imagesDir = Directory(p.join(docs.path, _imagesFolder));
+    final Database current = await AppDatabase.instance.database;
+    final File dbFile = File(current.path);
+    await AppDatabase.instance.close();
+
+    final Directory tempDir = await getTemporaryDirectory();
+    final String timestamp = DateFormat('yyyyMMdd_HHmmss')
+        .format(DateTime.now());
+    final Directory safetyDir = Directory(
+      p.join(tempDir.path, 'sutura_restore_$timestamp'),
+    );
+
+    bool dbBackedUp = false;
+    bool imagesBackedUp = false;
+
+    try {
+      await safetyDir.create(recursive: true);
+      if (await dbFile.exists()) {
+        await dbFile.copy(p.join(safetyDir.path, _dbFileName));
+        dbBackedUp = true;
+      }
+      if (await imagesDir.exists()) {
+        await _copyDirectory(
+          imagesDir,
+          Directory(p.join(safetyDir.path, _imagesFolder)),
+        );
+        imagesBackedUp = true;
+      }
+
+      await _deleteDatabaseFiles(dbFile.path);
+      await dbFile.writeAsBytes(newDbBytes, flush: true);
+
       if (await imagesDir.exists()) {
         await imagesDir.delete(recursive: true);
       }
       await imagesDir.create(recursive: true);
-
-      // Supprime l'ancienne base
-      final File oldDb = File(dbPath);
-      if (await oldDb.exists()) {
-        await oldDb.delete();
-      }
-      // Supprime aussi les journaux WAL/SHM s'ils existent
-      for (final String suffix in <String>['-wal', '-shm']) {
-        final File journal = File('$dbPath$suffix');
-        if (await journal.exists()) await journal.delete();
+      for (final MapEntry<String, Uint8List> entry in restoredImages.entries) {
+        await File(p.join(imagesDir.path, entry.key))
+            .writeAsBytes(entry.value, flush: true);
       }
 
-      bool dbRestored = false;
-      for (final ArchiveFile file in archive) {
-        if (file.isFile) {
-          final String filename = file.name.replaceAll('\\', '/');
-          final List<int> data = file.content as List<int>;
-
-          if (filename == _dbFileName || filename.endsWith('/$_dbFileName')) {
-            final File outFile = File(dbPath);
-            await outFile.writeAsBytes(data);
-            dbRestored = true;
-          } else if (filename.startsWith('$_imagesFolder/')) {
-            final String imageName = p.basename(filename);
-            if (imageName.isNotEmpty) {
-              final File outFile = File(p.join(imagesDir.path, imageName));
-              await outFile.writeAsBytes(data);
-            }
-          }
-        }
+      final Database db = await AppDatabase.instance.database;
+      final List<Map<String, Object?>> check = await db.rawQuery(
+        "SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table'",
+      );
+      if (((check.first['n'] as int?) ?? 0) == 0) {
+        throw StateError('La base restaurée ne contient aucune table');
       }
 
-      // Rouvre la base
-      await AppDatabase.instance.database;
-      // Les écrans affichent des données périmées : on les rafraîchit tous.
       DataController.instance.notifyAll();
-      return dbRestored;
-    } catch (_) {
-      // Tente de rouvrir la base même en cas d'erreur partielle
+      await _tryDeleteDirectory(safetyDir);
+      return BackupResult.success;
+    } catch (error, stackTrace) {
+      debugPrint('Échec de la restauration : $error\n$stackTrace');
+      await _rollback(
+        dbFile: dbFile,
+        imagesDir: imagesDir,
+        safetyDir: safetyDir,
+        dbBackedUp: dbBackedUp,
+        imagesBackedUp: imagesBackedUp,
+      );
+      return BackupResult.failed;
+    }
+  }
+
+  Future<void> _rollback({
+    required File dbFile,
+    required Directory imagesDir,
+    required Directory safetyDir,
+    required bool dbBackedUp,
+    required bool imagesBackedUp,
+  }) async {
+    try {
+      await AppDatabase.instance.close();
+      await _deleteDatabaseFiles(dbFile.path);
+      if (dbBackedUp) {
+        await File(p.join(safetyDir.path, _dbFileName)).copy(dbFile.path);
+      }
+      if (imagesBackedUp) {
+        if (await imagesDir.exists()) {
+          await imagesDir.delete(recursive: true);
+        }
+        await _copyDirectory(
+          Directory(p.join(safetyDir.path, _imagesFolder)),
+          imagesDir,
+        );
+      }
+      await AppDatabase.instance.database;
+      DataController.instance.notifyAll();
+    } catch (error, stackTrace) {
+      debugPrint('Échec du retour arrière : $error\n$stackTrace');
       try {
         await AppDatabase.instance.database;
       } catch (_) {}
-      return false;
+    } finally {
+      await _tryDeleteDirectory(safetyDir);
     }
+  }
+
+  Future<void> _deleteDatabaseFiles(String dbPath) async {
+    for (final String suffix in <String>['', '-wal', '-shm', '-journal']) {
+      final File file = File('$dbPath$suffix');
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
+  }
+
+  Future<void> _copyDirectory(Directory source, Directory destination) async {
+    await destination.create(recursive: true);
+    await for (final FileSystemEntity entity in source.list()) {
+      if (entity is File) {
+        await entity.copy(p.join(destination.path, p.basename(entity.path)));
+      }
+    }
+  }
+
+  Future<void> _tryDeleteDirectory(Directory dir) async {
+    try {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } catch (_) {}
+  }
+
+  bool _isSqliteFile(List<int> bytes) {
+    if (bytes.length < _sqliteHeader.length) return false;
+    for (int i = 0; i < _sqliteHeader.length; i++) {
+      if (bytes[i] != _sqliteHeader[i]) return false;
+    }
+    return true;
   }
 }
