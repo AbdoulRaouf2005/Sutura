@@ -2,8 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sutura/features/gallery/models/garment_model.dart';
 
 void main() {
+  /// Tests du modèle GarmentModel : sérialisation, optionnels et archivage.
   group('GarmentModel', () {
+    /// Vérifie qu'un aller-retour toMap/fromMap conserve tous les champs.
     test('sérialise et désérialise sans perte', () {
+      // Modèle complet servant de référence pour le round-trip.
       final GarmentModel model = GarmentModel(
         id: 'g1',
         name: 'Boubou brodé',
@@ -14,6 +17,7 @@ void main() {
         updatedAt: DateTime(2026, 2, 3),
       );
 
+      // Reconstruit le modèle à partir de sa représentation en map.
       final GarmentModel roundTrip = GarmentModel.fromMap(model.toMap());
 
       expect(roundTrip.id, model.id);
@@ -24,6 +28,7 @@ void main() {
       expect(roundTrip.isArchived, isFalse);
     });
 
+    /// Vérifie que les champs absents valent null et que l'archivage est stocké en entier.
     test('gère les champs optionnels et l\'archivage', () {
       final GarmentModel model = GarmentModel(
         id: 'g2',
@@ -39,6 +44,7 @@ void main() {
       expect(map['is_archived'], 1);
     });
 
+    /// Vérifie que copyWith peut effacer la photo et la catégorie.
     test('copyWith efface la photo et la catégorie', () {
       final GarmentModel model = GarmentModel(
         id: 'g3',
@@ -48,14 +54,17 @@ void main() {
         createdAt: DateTime(2026, 1, 1),
         updatedAt: DateTime(2026, 1, 1),
       );
-      final GarmentModel cleared =
-          model.copyWith(clearImage: true, clearCategory: true);
+      final GarmentModel cleared = model.copyWith(
+        clearImage: true,
+        clearCategory: true,
+      );
       expect(cleared.localImagePath, isNull);
       expect(cleared.category, isNull);
       expect(cleared.name, 'Kaftan');
     });
   });
 
+  /// Vérifie que la liste des catégories par défaut n'est pas vide et sans doublon.
   test('les catégories par défaut n\'ont pas de doublon', () {
     expect(kGarmentCategories, isNotEmpty);
     expect(kGarmentCategories.toSet().length, kGarmentCategories.length);

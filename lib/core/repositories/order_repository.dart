@@ -6,10 +6,17 @@ import '../../features/orders/models/order.dart';
 
 /// Accès aux commandes (table `orders`).
 class OrderRepository {
+  /// Crée le dépôt avec une base optionnelle [db].
   OrderRepository({AppDatabase? db}) : _db = db ?? AppDatabase.instance;
 
+  /// Instance de base de données utilisée pour les opérations.
   final AppDatabase _db;
 
+  /// Liste les commandes selon les filtres fournis.
+  ///
+  /// [clientId] limite à un client, [status] à un statut, [onlyLate] aux
+  /// commandes en retard et [onlyUpcoming] aux commandes à venir.
+  /// Retourne la liste triée par date de livraison.
   Future<List<Order>> list({
     String? clientId,
     OrderStatus? status,
@@ -52,6 +59,9 @@ class OrderRepository {
     return rows.map(Order.fromMap).toList();
   }
 
+  /// Recherche une commande par son identifiant [id].
+  ///
+  /// Retourne la commande trouvée ou `null` si elle n'existe pas.
   Future<Order?> findById(String id) async {
     final db = await _db.database;
     final List<Map<String, Object?>> rows = await db.query(
@@ -63,10 +73,11 @@ class OrderRepository {
     return rows.isEmpty ? null : Order.fromMap(rows.first);
   }
 
-  /// Commandes accompagnées du nom du client, en une seule requête.
+  /// Retourne les commandes accompagnées du nom du client en une seule requête.
   ///
   /// Évite une requête par commande, ce qui ralentissait nettement la liste
   /// dès que l'atelier avait quelques dizaines de commandes.
+  /// Les paramètres de filtre sont identiques à [list].
   Future<List<OrderWithClient>> listWithClientNames({
     String? clientId,
     OrderStatus? status,
@@ -99,18 +110,16 @@ class OrderRepository {
       args.add(nowIso);
     }
 
-    final String where =
-        clauses.isEmpty ? '' : 'WHERE ${clauses.join(' AND ')}';
-    final List<Map<String, Object?>> rows = await db.rawQuery(
-      '''
+    final String where = clauses.isEmpty
+        ? ''
+        : 'WHERE ${clauses.join(' AND ')}';
+    final List<Map<String, Object?>> rows = await db.rawQuery('''
       SELECT o.*, c.full_name AS client_name
       FROM orders o
       LEFT JOIN clients c ON c.id = o.client_id
       $where
       ORDER BY o.delivery_at ASC
-      ''',
-      args,
-    );
+      ''', args);
     return rows
         .map(
           (Map<String, Object?> row) => OrderWithClient(
@@ -121,6 +130,7 @@ class OrderRepository {
         .toList();
   }
 
+  /// Insère une nouvelle [order] dans la base et notifie les écouteurs.
   Future<void> insert(Order order) async {
     final db = await _db.database;
     await db.insert(
@@ -131,6 +141,7 @@ class OrderRepository {
     DataController.instance.notify(DataEntity.orders);
   }
 
+  /// Met à jour une [order] existante et notifie les écouteurs.
   Future<void> update(Order order) async {
     final db = await _db.database;
     await db.update(
@@ -142,7 +153,7 @@ class OrderRepository {
     DataController.instance.notify(DataEntity.orders);
   }
 
-  /// Nombre de commandes actives (ni livrées ni annulées).
+  /// Retourne le nombre de commandes actives (ni livrées ni annulées).
   Future<int> countActive() async {
     final db = await _db.database;
     final List<Map<String, Object?>> rows = await db.rawQuery(
@@ -152,7 +163,7 @@ class OrderRepository {
     return (rows.first['n'] as int?) ?? 0;
   }
 
-  /// Nombre de commandes en retard (calculé, §4.5).
+  /// Retourne le nombre de commandes en retard (calculé, §4.5).
   Future<int> countLate() async {
     final db = await _db.database;
     final List<Map<String, Object?>> rows = await db.rawQuery(
@@ -163,19 +174,16 @@ class OrderRepository {
     return (rows.first['n'] as int?) ?? 0;
   }
 
-  /// Commandes à livrer dans les [days] prochains jours, non livrées/annulées.
+  /// Retourne les commandes à livrer dans les [days] prochains jours,
+  /// non livrées et non annulées.
   Future<List<Order>> upcomingWithin(int days) async {
     final db = await _db.database;
     final DateTime now = DateTime.now();
     final DateTime limit = now.add(Duration(days: days));
     final List<Map<String, Object?>> rows = await db.query(
       'orders',
-      where:
-          "delivery_at >= ? AND delivery_at <= ? AND status NOT IN ('delivered', 'cancelled')",
-      whereArgs: <Object?>[
-        now.toIso8601String(),
-        limit.toIso8601String(),
-      ],
+      where: "delivery_at >= ? AND delivery_at <= ? AND status NOT IN ('delivered', 'cancelled')",
+      whereArgs: <Object?>[now.toIso8601String(), limit.toIso8601String()],
       orderBy: 'delivery_at ASC',
     );
     return rows.map(Order.fromMap).toList();

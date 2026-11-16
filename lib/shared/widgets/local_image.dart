@@ -5,6 +5,10 @@ import 'package:flutter/material.dart';
 /// Affiche une photo locale avec une gestion propre des cas d'erreur :
 /// fichier manquant, invalide, ou vide (§11).
 class LocalImage extends StatelessWidget {
+  /// Crée une image locale.
+  ///
+  /// [path] est le chemin du fichier ; [fit] contrôle le cadrage et [label]
+  /// le texte accessible. [cacheWidth] peut réduire la mémoire de décodage.
   const LocalImage({
     super.key,
     required this.path,
@@ -13,7 +17,10 @@ class LocalImage extends StatelessWidget {
     this.cacheWidth,
   });
 
+  /// Chemin local du fichier image ; `null` ou vide affiche un espace réservé.
   final String? path;
+
+  /// Mode d'ajustement de l'image dans son espace.
   final BoxFit fit;
 
   /// Texte alternatif/accessible pour l'image (guide §11).
@@ -25,6 +32,7 @@ class LocalImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Aucun chemin fourni : affiche directement l'espace réservé.
     if (path == null || path!.isEmpty) {
       return const _Placeholder(icon: Icons.image_outlined);
     }
@@ -34,6 +42,7 @@ class LocalImage extends StatelessWidget {
       semanticLabel: label,
       gaplessPlayback: true,
       cacheWidth: cacheWidth,
+      // Fichier manquant ou illisible : affiche une icône d'image cassée.
       errorBuilder: (_, _, _) =>
           const _Placeholder(icon: Icons.broken_image_outlined),
     );
@@ -41,8 +50,10 @@ class LocalImage extends StatelessWidget {
 }
 
 class _Placeholder extends StatelessWidget {
+  /// Espace réservé affiché lorsqu'aucune image valide n'est disponible.
   const _Placeholder({required this.icon});
 
+  /// Icône représentant l'état (image absente ou cassée).
   final IconData icon;
 
   @override

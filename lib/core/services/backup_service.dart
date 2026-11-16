@@ -13,7 +13,16 @@ import '../database/app_database.dart';
 import '../state/data_controller.dart';
 
 /// Résultat d'une opération de sauvegarde ou de restauration.
-enum BackupResult { success, cancelled, failed }
+enum BackupResult {
+  /// L'opération s'est terminée avec succès.
+  success,
+
+  /// L'opération a été annulée par l'utilisateur.
+  cancelled,
+
+  /// L'opération a échoué.
+  failed,
+}
 
 /// Sauvegarde et restauration de la base SQLite et des photos locales.
 ///
@@ -21,19 +30,26 @@ enum BackupResult { success, cancelled, failed }
 /// - `sutura.db` (base de données)
 /// - `garment_images/` (répertoire des photos copiées)
 class BackupService {
+  /// Constructeur privé pour le singleton.
   BackupService._();
 
+  /// Instance unique du service de sauvegarde.
   static final BackupService instance = BackupService._();
 
+  /// Nom du fichier de base dans l'archive.
   static const String _dbFileName = 'sutura.db';
+
+  /// Nom du dossier contenant les images dans l'archive.
   static const String _imagesFolder = 'garment_images';
 
+  /// En-tête binaire caractéristique d'un fichier SQLite valide.
   static const List<int> _sqliteHeader = <int>[
     0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, // "SQLite"
     0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00, // " format 3\0"
   ];
 
   /// Exporte la base et les images dans un fichier zip.
+  ///
   /// Retourne le chemin du fichier créé, ou `null` en cas d'échec.
   Future<String?> exportBackup() async {
     try {
@@ -93,6 +109,8 @@ class BackupService {
   }
 
   /// Partage le fichier de sauvegarde avec l'application de partage système.
+  ///
+  /// Retourne un [BackupResult] indiquant le succès, l'annulation ou l'échec.
   Future<BackupResult> shareBackup() async {
     final String? zipPath = await exportBackup();
     if (zipPath == null) return BackupResult.failed;
@@ -116,6 +134,7 @@ class BackupService {
   /// Le contenu du zip est validé avant de toucher aux données actuelles. En
   /// cas d'échec pendant le remplacement, les données précédentes sont
   /// restaurées à partir d'une copie de secours.
+  /// Retourne un [BackupResult] indiquant le résultat de l'opération.
   Future<BackupResult> restoreFromPicker() async {
     FilePickerResult? picked;
     try {
@@ -235,6 +254,9 @@ class BackupService {
     }
   }
 
+  /// Restaure les données précédentes à partir de la copie de secours.
+  ///
+  /// Utilisé en cas d'échec pendant le processus de restauration.
   Future<void> _rollback({
     required File dbFile,
     required Directory imagesDir,
@@ -269,6 +291,7 @@ class BackupService {
     }
   }
 
+  /// Supprime le fichier de base de données et ses fichiers auxiliaires WAL/SHM/journal.
   Future<void> _deleteDatabaseFiles(String dbPath) async {
     for (final String suffix in <String>['', '-wal', '-shm', '-journal']) {
       final File file = File('$dbPath$suffix');
@@ -278,6 +301,7 @@ class BackupService {
     }
   }
 
+  /// Copie les fichiers d'un répertoire [source] vers [destination].
   Future<void> _copyDirectory(Directory source, Directory destination) async {
     await destination.create(recursive: true);
     await for (final FileSystemEntity entity in source.list()) {
@@ -287,12 +311,14 @@ class BackupService {
     }
   }
 
+  /// Tente de supprimer un répertoire [dir] sans lever d'exception en cas d'échec.
   Future<void> _tryDeleteDirectory(Directory dir) async {
     try {
       if (await dir.exists()) await dir.delete(recursive: true);
     } catch (_) {}
   }
 
+  /// Vérifie si les [bytes] correspondent à l'en-tête d'un fichier SQLite valide.
   bool _isSqliteFile(List<int> bytes) {
     if (bytes.length < _sqliteHeader.length) return false;
     for (int i = 0; i < _sqliteHeader.length; i++) {

@@ -7,6 +7,7 @@ import 'app_colors.dart';
 /// fonds (guide §1 et §2).
 @immutable
 class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
+  /// Crée un jeu de couleurs sémantiques.
   const AppSemanticColors({
     required this.success,
     required this.warning,
@@ -26,6 +27,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   /// Texte secondaire, atténué par rapport au texte principal.
   final Color onSurfaceMuted;
 
+  /// Jeu de couleurs sémantiques pour le thème clair.
   static const AppSemanticColors light = AppSemanticColors(
     success: AppColors.success,
     warning: AppColors.warning,
@@ -33,6 +35,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     onSurfaceMuted: AppColors.textSecondary,
   );
 
+  /// Jeu de couleurs sémantiques pour le thème sombre.
   static const AppSemanticColors dark = AppSemanticColors(
     success: Color(0xFF7FD1A3),
     warning: Color(0xFFFFB4A2),
@@ -40,11 +43,14 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     onSurfaceMuted: Color(0xFFB0A9B8),
   );
 
-  /// Raccourci de lecture depuis un `BuildContext`.
+  /// Raccourci de lecture des couleurs sémantiques depuis un [context].
+  ///
+  /// Retourne l'extension du thème courant ou la version claire par défaut.
   static AppSemanticColors of(BuildContext context) {
     return Theme.of(context).extension<AppSemanticColors>() ?? light;
   }
 
+  /// Retourne une copie avec les champs fournis remplacés.
   @override
   AppSemanticColors copyWith({
     Color? success,
@@ -60,6 +66,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     );
   }
 
+  /// Interpole entre cette instance et [other] selon le facteur [t].
   @override
   AppSemanticColors lerp(covariant AppSemanticColors? other, double t) {
     if (other == null) return this;

@@ -14,6 +14,7 @@ import '../../orders/models/order.dart';
 
 /// Données synthétiques du tableau de bord (cahier des charges §4.1).
 class DashboardData {
+  /// Crée une instance des données du tableau de bord.
   const DashboardData({
     required this.activeOrders,
     required this.lateOrders,
@@ -22,28 +23,48 @@ class DashboardData {
     required this.clientCount,
   });
 
+  /// Nombre de commandes actuellement actives.
   final int activeOrders;
+
+  /// Nombre de commandes en retard.
   final int lateOrders;
+
+  /// Liste des commandes à livrer prochainement.
   final List<Order> upcomingOrders;
+
+  /// Montant total restant à encaisser.
   final int totalOutstanding;
+
+  /// Nombre de clients actifs.
   final int clientCount;
 }
 
+/// Écran d'accueil affichant les indicateurs clés et les actions rapides.
 class DashboardScreen extends StatefulWidget {
+  /// Crée l'écran du tableau de bord.
   const DashboardScreen({super.key});
 
+  /// Crée l'état associé à cet écran.
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
+/// État de [DashboardScreen] chargé de récupérer et d'afficher les données.
 class _DashboardScreenState extends State<DashboardScreen>
     with DataEventsListener<DashboardScreen> {
+  /// Dépôt des commandes.
   final OrderRepository _orders = OrderRepository();
+
+  /// Dépôt des paiements.
   final PaymentRepository _payments = PaymentRepository();
+
+  /// Dépôt des clients.
   final ClientRepository _clients = ClientRepository();
 
+  /// Futur contenant les données du tableau de bord.
   Future<DashboardData>? _future;
 
+  /// Entités dont les changements déclenchent un rechargement.
   @override
   Set<DataEntity> get dataEntities => const <DataEntity>{
     DataEntity.orders,
@@ -51,15 +72,18 @@ class _DashboardScreenState extends State<DashboardScreen>
     DataEntity.clients,
   };
 
+  /// Initialise l'état et lance le premier chargement des données.
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  /// Recharge les données lorsque les entités écoutées sont modifiées.
   @override
   void onDataChanged() => _load();
 
+  /// Lance le chargement des données et met à jour le futur affiché.
   Future<void> _load() async {
     final Future<DashboardData> future = _fetch();
     setState(() {
@@ -68,7 +92,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     await future;
   }
 
+  /// Récupère les indicateurs et listes nécessaires au tableau de bord.
+  ///
+  /// Retourne une instance de [DashboardData] agrégée depuis les dépôts.
   Future<DashboardData> _fetch() async {
+    // Récupération des indicateurs de commandes, paiements et clients.
     final int active = await _orders.countActive();
     final int late = await _orders.countLate();
     final List<Order> upcoming = await _orders.upcomingWithin(7);
@@ -83,6 +111,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Construit l'interface du tableau de bord selon l'état du chargement.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -92,9 +121,11 @@ class _DashboardScreenState extends State<DashboardScreen>
         child: FutureBuilder<DashboardData>(
           future: _future,
           builder: (BuildContext context, AsyncSnapshot<DashboardData> snapshot) {
+            // Affichage d'un indicateur pendant le chargement.
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
+            // Affichage d'un état d'erreur en cas d'échec.
             if (snapshot.hasError) {
               return ErrorState(
                 message: 'Impossible de charger le tableau de bord.',
@@ -102,6 +133,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               );
             }
             final DashboardData data = snapshot.data!;
+            // Affichage d'un message d'accueil si aucune donnée n'existe encore.
             if (data.activeOrders == 0 && data.clientCount == 0) {
               return ListView(
                 padding: const EdgeInsets.all(AppSpacing.xl),
@@ -116,6 +148,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ],
               );
             }
+            // Affichage des indicateurs, des livraisons à venir et des actions.
             return ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               children: <Widget>[
@@ -149,11 +182,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 }
 
+/// Grille des indicateurs clés du tableau de bord.
 class _KpiGrid extends StatelessWidget {
+  /// Crée la grille des indicateurs.
   const _KpiGrid({required this.data});
 
+  /// Données à afficher dans les indicateurs.
   final DashboardData data;
 
+  /// Construit les cartes d'indicateurs.
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -192,7 +229,9 @@ class _KpiGrid extends StatelessWidget {
   }
 }
 
+/// Carte affichant un indicateur clé (KPI).
 class _KpiCard extends StatelessWidget {
+  /// Crée une carte d'indicateur.
   const _KpiCard({
     required this.icon,
     required this.label,
@@ -201,12 +240,22 @@ class _KpiCard extends StatelessWidget {
     this.wide = false,
   });
 
+  /// Icône associée à l'indicateur.
   final IconData icon;
+
+  /// Libellé de l'indicateur.
   final String label;
+
+  /// Valeur affichée de l'indicateur.
   final String value;
+
+  /// Couleur principale de l'indicateur.
   final Color color;
+
+  /// Indique si la carte occupe toute la largeur.
   final bool wide;
 
+  /// Construit la carte d'indicateur.
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -256,7 +305,9 @@ class _KpiCard extends StatelessWidget {
   }
 }
 
+/// Titre de section avec icône et action optionnelle.
 class _SectionTitle extends StatelessWidget {
+  /// Crée un titre de section.
   const _SectionTitle({
     required this.icon,
     required this.label,
@@ -264,11 +315,19 @@ class _SectionTitle extends StatelessWidget {
     this.onAction,
   });
 
+  /// Icône affichée avant le libellé.
   final IconData icon;
+
+  /// Libellé de la section.
   final String label;
+
+  /// Libellé du bouton d'action optionnel.
   final String? actionLabel;
+
+  /// Action déclenchée par le bouton optionnel.
   final VoidCallback? onAction;
 
+  /// Construit le titre de section.
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -288,13 +347,18 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
+/// Liste des prochaines commandes à livrer.
 class _UpcomingList extends StatelessWidget {
+  /// Crée la liste des livraisons à venir.
   const _UpcomingList({required this.orders});
 
+  /// Commandes à afficher.
   final List<Order> orders;
 
+  /// Construit la liste ou un message si aucune livraison n'est prévue.
   @override
   Widget build(BuildContext context) {
+    // Affichage d'un message si aucune livraison n'est prévue.
     if (orders.isEmpty) {
       return const Card(
         child: Padding(
@@ -305,6 +369,7 @@ class _UpcomingList extends StatelessWidget {
     }
     return Column(
       children: orders.take(5).map((Order order) {
+        // Détermination du retard pour adapter le libellé et le style.
         final bool late = order.isLate();
         return Card(
           margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -327,6 +392,7 @@ class _UpcomingList extends StatelessWidget {
                 const Icon(Icons.chevron_right),
               ],
             ),
+            // Navigation vers le détail de la commande sélectionnée.
             onTap: () => context.push('/commandes/${order.id}'),
           ),
         );
@@ -335,17 +401,25 @@ class _UpcomingList extends StatelessWidget {
   }
 }
 
+/// Section des actions rapides du tableau de bord.
 class _QuickActions extends StatelessWidget {
+  /// Crée la section des actions rapides.
   const _QuickActions({
     required this.onNewClient,
     required this.onNewOrder,
     required this.onGallery,
   });
 
+  /// Action de création d'un nouveau client.
   final VoidCallback onNewClient;
+
+  /// Action de création d'une nouvelle commande.
   final VoidCallback onNewOrder;
+
+  /// Action d'ouverture de la galerie.
   final VoidCallback onGallery;
 
+  /// Construit les tuiles d'actions rapides.
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -378,17 +452,25 @@ class _QuickActions extends StatelessWidget {
   }
 }
 
+/// Tuile cliquable représentant une action rapide.
 class _ActionTile extends StatelessWidget {
+  /// Crée une tuile d'action.
   const _ActionTile({
     required this.icon,
     required this.label,
     required this.onTap,
   });
 
+  /// Icône de l'action.
   final IconData icon;
+
+  /// Libellé de l'action.
   final String label;
+
+  /// Action déclenchée lors du clic.
   final VoidCallback onTap;
 
+  /// Construit la tuile d'action.
   @override
   Widget build(BuildContext context) {
     return Card(

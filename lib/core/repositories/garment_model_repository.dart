@@ -6,10 +6,16 @@ import '../../features/gallery/models/garment_model.dart';
 
 /// Accès aux modèles de la galerie (table `garment_models`).
 class GarmentModelRepository {
+  /// Crée le dépôt avec une base optionnelle [db].
   GarmentModelRepository({AppDatabase? db}) : _db = db ?? AppDatabase.instance;
 
+  /// Instance de base de données utilisée pour les opérations.
   final AppDatabase _db;
 
+  /// Liste les modèles de vêtements avec filtres optionnels.
+  ///
+  /// [query] filtre par nom, [category] par catégorie et [includeArchived]
+  /// inclut les modèles archivés. Retourne la liste correspondante.
   Future<List<GarmentModel>> list({
     String query = '',
     String? category,
@@ -41,6 +47,9 @@ class GarmentModelRepository {
     return rows.map(GarmentModel.fromMap).toList();
   }
 
+  /// Recherche un modèle par son identifiant [id].
+  ///
+  /// Retourne le modèle trouvé ou `null` s'il n'existe pas.
   Future<GarmentModel?> findById(String id) async {
     final db = await _db.database;
     final List<Map<String, Object?>> rows = await db.query(
@@ -52,6 +61,7 @@ class GarmentModelRepository {
     return rows.isEmpty ? null : GarmentModel.fromMap(rows.first);
   }
 
+  /// Insère un nouveau [model] dans la base et notifie les écouteurs.
   Future<void> insert(GarmentModel model) async {
     final db = await _db.database;
     await db.insert(
@@ -62,6 +72,7 @@ class GarmentModelRepository {
     DataController.instance.notify(DataEntity.models);
   }
 
+  /// Met à jour un [model] existant et notifie les écouteurs.
   Future<void> update(GarmentModel model) async {
     final db = await _db.database;
     await db.update(
@@ -73,6 +84,7 @@ class GarmentModelRepository {
     DataController.instance.notify(DataEntity.models);
   }
 
+  /// Retourne le nombre de modèles actifs (non archivés).
   Future<int> countActive() async {
     final db = await _db.database;
     final List<Map<String, Object?>> rows = await db.rawQuery(

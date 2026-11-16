@@ -12,21 +12,36 @@ import '../utils/id_generator.dart';
 /// que de conserver uniquement un chemin temporaire du sélecteur. Elles sont
 /// redimensionnées et compressées pour ne pas remplir le téléphone.
 class LocalImageStorage {
+  /// Crée le service de stockage avec un sélecteur d'images optionnel [picker].
   LocalImageStorage({ImagePicker? picker}) : _picker = picker ?? ImagePicker();
 
+  /// Sélecteur d'images utilisé pour capturer ou choisir une photo.
   final ImagePicker _picker;
 
+  /// Nom du dossier de stockage des images dans les documents de l'application.
   static const String _folder = 'garment_images';
+
+  /// Largeur maximale appliquée lors du redimensionnement.
   static const double _maxWidth = 1200;
+
+  /// Hauteur maximale appliquée lors du redimensionnement.
   static const double _maxHeight = 1600;
+
+  /// Qualité de compression JPEG appliquée lors de l'enregistrement.
   static const int _quality = 80;
 
   /// Prend une photo avec l'appareil photo puis la copie en local.
+  ///
+  /// Retourne le chemin du fichier enregistré ou `null` si annulé.
   Future<String?> pickFromCamera() => _pickAndStore(ImageSource.camera);
 
-  /// Choisit une image existante puis la copie en local.
+  /// Choisit une image existante depuis la galerie puis la copie en local.
+  ///
+  /// Retourne le chemin du fichier enregistré ou `null` si annulé.
   Future<String?> pickFromGallery() => _pickAndStore(ImageSource.gallery);
 
+  /// Sélectionne une image depuis la [source] donnée, la copie localement et
+  /// retourne son chemin, ou `null` si la sélection est annulée.
   Future<String?> _pickAndStore(ImageSource source) async {
     final XFile? picked = await _picker.pickImage(
       source: source,
@@ -47,6 +62,7 @@ class LocalImageStorage {
     return destination;
   }
 
+  /// S'assure que le répertoire de stockage des images existe et le retourne.
   Future<Directory> _ensureDirectory() async {
     final Directory base = await getApplicationDocumentsDirectory();
     final Directory dir = Directory(p.join(base.path, _folder));

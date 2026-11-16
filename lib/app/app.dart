@@ -6,8 +6,10 @@ import 'router.dart';
 
 /// Racine de l'application Sutura.
 class SuturaApp extends StatelessWidget {
+  /// Crée le widget racine de l'application.
   const SuturaApp({super.key});
 
+  /// Construit l'application en appliquant le thème et la configuration du routeur.
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(

@@ -10,13 +10,20 @@ import '../models/garment_model.dart';
 /// les modèles. L'écran renvoie l'identifiant du modèle à modifier lorsqu'on
 /// appuie sur « Modifier ».
 class GalleryPreviewScreen extends StatefulWidget {
+  /// Crée l'aperçu d'un lot de modèles.
+  ///
+  /// [models] est la liste complète affichée et [initialIndex] la position
+  /// de départ dans cette liste.
   const GalleryPreviewScreen({
     super.key,
     required this.models,
     required this.initialIndex,
   });
 
+  /// Modèles à parcourir dans l'aperçu.
   final List<GarmentModel> models;
+
+  /// Index du modèle affiché à l'ouverture.
   final int initialIndex;
 
   @override
@@ -30,6 +37,7 @@ class _GalleryPreviewScreenState extends State<GalleryPreviewScreen> {
   @override
   void initState() {
     super.initState();
+    // Borne l'index de départ pour éviter tout dépassement de la liste.
     _index = widget.initialIndex.clamp(0, widget.models.length - 1);
     _controller = PageController(initialPage: _index);
   }
@@ -40,6 +48,7 @@ class _GalleryPreviewScreenState extends State<GalleryPreviewScreen> {
     super.dispose();
   }
 
+  /// Modèle actuellement affiché, mis à jour à chaque changement de page.
   GarmentModel get _current => widget.models[_index];
 
   @override
@@ -49,6 +58,7 @@ class _GalleryPreviewScreenState extends State<GalleryPreviewScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: <Widget>[
+          // Défilement horizontal d'un modèle à l'autre.
           PageView.builder(
             controller: _controller,
             itemCount: widget.models.length,
@@ -64,6 +74,7 @@ class _GalleryPreviewScreenState extends State<GalleryPreviewScreen> {
               );
             },
           ),
+          // Dégradés haut et bas pour garder les textes lisibles sur la photo.
           const _TopScrim(),
           const _BottomScrim(),
           SafeArea(
@@ -77,6 +88,7 @@ class _GalleryPreviewScreenState extends State<GalleryPreviewScreen> {
                 const Spacer(),
                 _PreviewDetails(
                   model: _current,
+                  // Renvoie l'identifiant du modèle pour ouvrir l'édition.
                   onEdit: () => Navigator.of(context).pop(_current.id),
                 ),
               ],
@@ -89,14 +101,20 @@ class _GalleryPreviewScreenState extends State<GalleryPreviewScreen> {
 }
 
 class _PreviewHeader extends StatelessWidget {
+  /// Barre supérieure : bouton de fermeture et compteur de position.
   const _PreviewHeader({
     required this.position,
     required this.total,
     required this.onClose,
   });
 
+  /// Position courante (1-based) dans le lot.
   final int position;
+
+  /// Nombre total de modèles.
   final int total;
+
+  /// Action déclenchée pour fermer l'aperçu.
   final VoidCallback onClose;
 
   @override
@@ -132,13 +150,18 @@ class _PreviewHeader extends StatelessWidget {
 }
 
 class _PreviewDetails extends StatelessWidget {
+  /// Bloc d'informations du modèle : nom, catégorie, description et édition.
   const _PreviewDetails({required this.model, required this.onEdit});
 
+  /// Modèle actuellement affiché.
   final GarmentModel model;
+
+  /// Action déclenchée pour demander la modification du modèle.
   final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
+    // On ignore une description vide ou composée uniquement d'espaces.
     final String? description = model.description?.trim();
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -204,6 +227,7 @@ class _PreviewDetails extends StatelessWidget {
   }
 }
 
+/// Dégradé sombre en haut de l'écran, derrière l'en-tête.
 class _TopScrim extends StatelessWidget {
   const _TopScrim();
 
@@ -229,6 +253,7 @@ class _TopScrim extends StatelessWidget {
   }
 }
 
+/// Dégradé sombre en bas de l'écran, derrière les détails du modèle.
 class _BottomScrim extends StatelessWidget {
   const _BottomScrim();
 

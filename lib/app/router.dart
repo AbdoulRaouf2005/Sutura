@@ -21,17 +21,22 @@ import 'app_shell.dart';
 /// persistantes (guide §6). Les routes des écrans détaillés (mensurations,
 /// galerie, commandes, paiements) seront ajoutées au fur et à mesure.
 abstract final class AppRouter {
-  static final GlobalKey<NavigatorState> _rootKey =
-      GlobalKey<NavigatorState>(debugLabel: 'root');
+  /// Clé de navigation racine utilisée pour les routes hors coquille.
+  static final GlobalKey<NavigatorState> _rootKey = GlobalKey<NavigatorState>(
+    debugLabel: 'root',
+  );
 
+  /// Instance du routeur principal de l'application.
   static final GoRouter router = GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/accueil',
     routes: <RouteBase>[
       StatefulShellRoute.indexedStack(
-        builder: (BuildContext context, GoRouterState state,
-                StatefulNavigationShell shell) =>
-            AppShell(navigationShell: shell),
+        builder: (
+          BuildContext context,
+          GoRouterState state,
+          StatefulNavigationShell shell,
+        ) => AppShell(navigationShell: shell),
         branches: <StatefulShellBranch>[
           StatefulShellBranch(
             routes: <RouteBase>[
@@ -59,9 +64,8 @@ abstract final class AppRouter {
                   ),
                   GoRoute(
                     path: ':id/modifier',
-                    builder: (_, GoRouterState state) => ClientFormScreen(
-                      clientId: state.pathParameters['id'],
-                    ),
+                    builder: (_, GoRouterState state) =>
+                        ClientFormScreen(clientId: state.pathParameters['id']),
                   ),
                   GoRoute(
                     path: ':id/mensurations',
@@ -73,16 +77,16 @@ abstract final class AppRouter {
                         path: 'nouveau',
                         builder: (_, GoRouterState state) =>
                             MeasurementFormScreen(
-                          clientId: state.pathParameters['id']!,
-                        ),
+                              clientId: state.pathParameters['id']!,
+                            ),
                       ),
                       GoRoute(
                         path: ':setId',
                         builder: (_, GoRouterState state) =>
                             MeasurementDetailScreen(
-                          clientId: state.pathParameters['id']!,
-                          setId: state.pathParameters['setId']!,
-                        ),
+                              clientId: state.pathParameters['id']!,
+                              setId: state.pathParameters['setId']!,
+                            ),
                       ),
                     ],
                   ),
@@ -99,7 +103,8 @@ abstract final class AppRouter {
                   GoRoute(
                     path: 'nouvelle',
                     builder: (_, GoRouterState state) => OrderFormScreen(
-                      preselectedClientId: state.uri.queryParameters['clientId'],
+                      preselectedClientId:
+                          state.uri.queryParameters['clientId'],
                     ),
                   ),
                   GoRoute(

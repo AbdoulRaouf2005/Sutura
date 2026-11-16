@@ -6,10 +6,13 @@ import 'app_spacing.dart';
 
 /// Thème centralisé de Sutura — Material 3, clair par défaut.
 abstract final class AppTheme {
+  /// Thème clair de l'application.
   static ThemeData get light => _build(Brightness.light);
 
+  /// Thème sombre de l'application.
   static ThemeData get dark => _build(Brightness.dark);
 
+  /// Construit un [ThemeData] complet pour la luminosité [brightness] donnée.
   static ThemeData _build(Brightness brightness) {
     final bool isDark = brightness == Brightness.dark;
 
@@ -32,14 +35,17 @@ abstract final class AppTheme {
       extensions: <ThemeExtension<dynamic>>[
         isDark ? AppSemanticColors.dark : AppSemanticColors.light,
       ],
-      scaffoldBackgroundColor:
-          isDark ? AppColors.darkBackground : AppColors.background,
+      scaffoldBackgroundColor: isDark
+          ? AppColors.darkBackground
+          : AppColors.background,
       textTheme: baseText.apply(
         bodyColor: scheme.onSurface,
         displayColor: scheme.onSurface,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: isDark ? AppColors.darkBackground : AppColors.background,
+        backgroundColor: isDark
+            ? AppColors.darkBackground
+            : AppColors.background,
         foregroundColor: scheme.onSurface,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -135,10 +141,7 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
         ),
       ),
-      dividerTheme: DividerThemeData(
-        color: scheme.outline,
-        thickness: 1,
-      ),
+      dividerTheme: DividerThemeData(color: scheme.outline, thickness: 1),
     );
   }
 }

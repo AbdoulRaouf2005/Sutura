@@ -9,11 +9,13 @@ import '../core/theme/app_spacing.dart';
 /// logo de chargement est affiché sur le fond vert de la marque, ce qui évite
 /// un écran blanc entre le lancement natif et le premier rendu Flutter.
 class LoadingScreen extends StatelessWidget {
+  /// Crée l'écran de chargement.
   const LoadingScreen({super.key});
 
-  /// Logo affiché pendant le chargement.
+  /// Chemin de l'asset du logo affiché pendant le chargement.
   static const String imageAsset = 'assets/logo/Sutura_Icone_Chargement.png';
 
+  /// Construit l'interface de l'écran de chargement.
   @override
   Widget build(BuildContext context) {
     return ColoredBox(

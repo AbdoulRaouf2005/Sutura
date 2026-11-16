@@ -6,24 +6,34 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 
-/// Préférences et sauvegarde (cahier des charges §4.7).
+/// Écran des préférences et de la sauvegarde (cahier des charges §4.7).
 class SettingsScreen extends StatefulWidget {
+  /// Crée l'écran des réglages.
   const SettingsScreen({super.key});
 
+  /// Crée l'état associé à cet écran.
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
+/// État de [SettingsScreen] gérant les préférences et les opérations de sauvegarde.
 class _SettingsScreenState extends State<SettingsScreen> {
+  /// Version affichée de l'application.
   static const String _appVersion = '1.0.0';
+
+  /// Indique si un export est en cours.
   bool _exporting = false;
+
+  /// Indique si une restauration est en cours.
   bool _restoring = false;
 
+  /// Lance l'export de la sauvegarde et affiche le résultat à l'utilisateur.
   Future<void> _export() async {
     setState(() => _exporting = true);
     final BackupResult result = await BackupService.instance.shareBackup();
     if (!mounted) return;
     setState(() => _exporting = false);
+    // Aucun message si l'utilisateur annule l'opération.
     if (result == BackupResult.cancelled) return;
     final bool ok = result == BackupResult.success;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -38,6 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Demande confirmation puis restaure une sauvegarde sélectionnée.
   Future<void> _restore() async {
     final bool confirmed = await confirmAction(
       context,
@@ -55,6 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         .restoreFromPicker();
     if (!mounted) return;
     setState(() => _restoring = false);
+    // Aucun message si l'utilisateur annule la sélection.
     if (result == BackupResult.cancelled) return;
     final bool ok = result == BackupResult.success;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -70,6 +82,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Construit l'interface des réglages et de la sauvegarde.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -183,11 +196,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
+/// En-tête de section dans l'écran des réglages.
 class _SectionHeader extends StatelessWidget {
+  /// Crée un en-tête de section.
   const _SectionHeader(this.label);
 
+  /// Libellé de la section.
   final String label;
 
+  /// Construit l'en-tête de section.
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -209,8 +226,10 @@ class _SectionHeader extends StatelessWidget {
 
 /// Sélecteur de thème : clair, sombre ou suivi du système.
 class _ThemeSelector extends StatelessWidget {
+  /// Crée le sélecteur de thème.
   const _ThemeSelector();
 
+  /// Construit le sélecteur de thème.
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -270,6 +289,7 @@ class _ThemeSelector extends StatelessWidget {
                     ],
                     selected: <ThemeMode>{ThemeController.instance.themeMode},
                     onSelectionChanged: (Set<ThemeMode> selection) {
+                      // Application du mode de thème sélectionné.
                       ThemeController.instance.setThemeMode(selection.first);
                     },
                   ),
@@ -283,16 +303,19 @@ class _ThemeSelector extends StatelessWidget {
   }
 }
 
-/// Bouton rapide clair/sombre dans la barre d'application.
+/// Bouton rapide de bascule clair/sombre dans la barre d'application.
 class _ThemeToggleButton extends StatelessWidget {
+  /// Crée le bouton de bascule du thème.
   const _ThemeToggleButton();
 
+  /// Construit le bouton de bascule du thème.
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: ThemeController.instance,
       builder: (BuildContext context, Widget? child) {
         final ThemeMode mode = ThemeController.instance.themeMode;
+        // Détermination du thème effectif affiché.
         final bool isDark =
             mode == ThemeMode.dark ||
             (mode == ThemeMode.system &&
@@ -303,6 +326,7 @@ class _ThemeToggleButton extends StatelessWidget {
             isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
           ),
           onPressed: () {
+            // Bascule entre thème clair et sombre.
             ThemeController.instance.toggleDark(
               systemIsDark:
                   MediaQuery.platformBrightnessOf(context) == Brightness.dark,

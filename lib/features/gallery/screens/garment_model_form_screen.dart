@@ -14,10 +14,16 @@ import '../models/garment_model.dart';
 /// En modification, le modèle déjà utilisé par une commande peut être archivé
 /// mais son historique est conservé (l'archivage n'efface rien).
 class GarmentModelFormScreen extends StatefulWidget {
+  /// Crée l'écran de saisie d'un modèle.
+  ///
+  /// Un [modelId] `null` correspond à une création ; sinon le modèle existant
+  /// est chargé pour être modifié.
   const GarmentModelFormScreen({super.key, this.modelId});
 
+  /// Identifiant du modèle à modifier, `null` en création.
   final String? modelId;
 
+  /// Indique si l'écran est en mode modification.
   bool get isEditing => modelId != null;
 
   @override
@@ -33,6 +39,8 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
 
   GarmentModel? _existing;
   String? _imagePath;
+
+  /// Indique que le fichier image référencé n'existe plus sur l'appareil.
   bool _imageMissing = false;
   String? _category;
   bool _loading = false;
@@ -51,6 +59,9 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
     super.dispose();
   }
 
+  /// Charge le modèle existant et pré-remplit le formulaire.
+  ///
+  /// Si le modèle est introuvable, affiche un message puis ferme l'écran.
   Future<void> _loadExisting() async {
     setState(() => _loading = true);
     final GarmentModel? model = await _repo.findById(widget.modelId!);
@@ -66,11 +77,13 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
     _description.text = model.description ?? '';
     _category = model.category;
     _imagePath = model.localImagePath;
+    // Vérifie la présence réelle du fichier pour prévenir s'il a été supprimé.
     _imageMissing = !await _images.fileExists(model.localImagePath);
     if (!mounted) return;
     setState(() => _loading = false);
   }
 
+  /// Ouvre la feuille de choix puis applique la photo sélectionnée ou retirée.
   Future<void> _changePhoto() async {
     final String? result = await showModalBottomSheet<String>(
       context: context,
@@ -78,16 +91,19 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
+            // Choix d'une photo prise à l'instant avec l'appareil photo.
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
               title: const Text('Prendre une photo'),
               onTap: () => Navigator.of(ctx).pop('camera'),
             ),
+            // Choix d'une photo déjà présente dans la galerie du téléphone.
             ListTile(
               leading: const Icon(Icons.image_outlined),
               title: const Text('Choisir une photo'),
               onTap: () => Navigator.of(ctx).pop('gallery'),
             ),
+            // Option de retrait, proposée uniquement si une photo est définie.
             if (_imagePath != null)
               ListTile(
                 leading: Icon(
@@ -103,6 +119,7 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
     );
     if (!mounted || result == null) return;
 
+    // Le retrait vide simplement le chemin local, sans toucher au fichier.
     if (result == 'remove') {
       setState(() {
         _imagePath = null;
@@ -111,6 +128,7 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
       return;
     }
 
+    // Capture ou sélection selon l'option retenue.
     final String? newPath = result == 'camera'
         ? await _images.pickFromCamera()
         : await _images.pickFromGallery();
@@ -121,32 +139,39 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
     });
   }
 
+  /// Valide le formulaire puis crée ou met à jour le modèle.
+  ///
+  /// En modification, l'ancienne image est supprimée si elle a été remplacée.
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     final DateTime now = DateTime.now();
     try {
       if (_existing == null) {
+        // Création : un nouvel identifiant est généré.
         final GarmentModel model = GarmentModel(
           id: newId(),
           name: _name.text.trim(),
           category: _category,
-          description:
-              _description.text.trim().isEmpty ? null : _description.text.trim(),
+          description: _description.text.trim().isEmpty
+              ? null
+              : _description.text.trim(),
           localImagePath: _imagePath,
           createdAt: now,
           updatedAt: now,
         );
         await _repo.insert(model);
       } else {
+        // Modification : mémorise l'ancienne image pour un éventuel nettoyage.
         final String? oldImage = _existing!.localImagePath;
         await _repo.update(
           _existing!.copyWith(
             name: _name.text.trim(),
             category: _category,
             clearCategory: _category == null,
-            description:
-                _description.text.trim().isEmpty ? null : _description.text.trim(),
+            description: _description.text.trim().isEmpty
+                ? null
+                : _description.text.trim(),
             clearDescription: _description.text.trim().isEmpty,
             localImagePath: _imagePath,
             clearImage: _imagePath == null,
@@ -165,6 +190,7 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
       );
       Navigator.of(context).pop(true);
     } catch (_) {
+      // En cas d'échec, réactive le bouton et prévient l'utilisateur.
       if (!mounted) return;
       setState(() => _saving = false);
       showAppSnackBar(
@@ -175,11 +201,15 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
     }
   }
 
+  /// Demande confirmation puis archive le modèle existant.
+  ///
+  /// L'archivage ne supprime aucune donnée : l'historique est conservé.
   Future<void> _archive() async {
     final bool confirmed = await confirmAction(
       context,
       title: 'Archiver ce modèle ?',
-      message: 'Il ne sera plus proposé dans les nouvelles commandes, '
+      message:
+          'Il ne sera plus proposé dans les nouvelles commandes, '
           'mais son historique sera conservé.',
       confirmLabel: 'Archiver',
     );
@@ -198,6 +228,7 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
       appBar: AppBar(
         title: Text(widget.isEditing ? 'Modifier le modèle' : 'Nouveau modèle'),
         actions: <Widget>[
+          // L'archivage n'est proposé que pour un modèle existant non archivé.
           if (widget.isEditing && _existing?.isArchived == false)
             IconButton(
               onPressed: _archive,
@@ -213,6 +244,7 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 children: <Widget>[
+                  // Zone d'aperçu / sélection de la photo du modèle.
                   _PhotoPicker(
                     imagePath: _imagePath,
                     missing: _imageMissing,
@@ -225,17 +257,16 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Nom du modèle *',
                     ),
+                    // Le nom est obligatoire (espaces ignorés).
                     validator: (String? value) =>
                         (value == null || value.trim().isEmpty)
-                            ? 'Ce champ est obligatoire.'
-                            : null,
+                        ? 'Ce champ est obligatoire.'
+                        : null,
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   DropdownButtonFormField<String>(
                     initialValue: _category,
-                    decoration: const InputDecoration(
-                      labelText: 'Catégorie',
-                    ),
+                    decoration: const InputDecoration(labelText: 'Catégorie'),
                     items: kGarmentCategories
                         .map(
                           (String category) => DropdownMenuItem<String>(
@@ -259,6 +290,7 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   FilledButton.icon(
+                    // Désactive le bouton pendant l'enregistrement.
                     onPressed: _saving ? null : _save,
                     icon: _saving
                         ? const SizedBox(
@@ -281,14 +313,20 @@ class _GarmentModelFormScreenState extends State<GarmentModelFormScreen> {
 }
 
 class _PhotoPicker extends StatelessWidget {
+  /// Zone d'aperçu de la photo avec invitation à en choisir une.
   const _PhotoPicker({
     required this.imagePath,
     required this.missing,
     required this.onTap,
   });
 
+  /// Chemin local de la photo, `null` si aucune n'est définie.
   final String? imagePath;
+
+  /// Indique que le fichier image référencé est introuvable.
   final bool missing;
+
+  /// Action déclenchée pour changer ou retirer la photo.
   final VoidCallback onTap;
 
   @override
@@ -302,14 +340,17 @@ class _PhotoPicker extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: <Widget>[
+              // Photo manquante : message invitant à en choisir une autre.
               if (missing)
                 const _PickPrompt(
                   icon: Icons.broken_image_outlined,
-                  label: 'Cette image n\'est plus disponible.\n'
+                  label:
+                      'Cette image n\'est plus disponible.\n'
                       'Choisissez une autre photo.',
                 )
               else
                 LocalImage(path: imagePath),
+              // Aucune photo définie : invitation à en ajouter une.
               if (missing)
                 const SizedBox.shrink()
               else if (imagePath == null)
@@ -318,6 +359,7 @@ class _PhotoPicker extends StatelessWidget {
                   label: 'Prendre une photo ou choisir une photo',
                 )
               else
+                // Photo présente : bouton pour la remplacer.
                 Positioned(
                   right: AppSpacing.sm,
                   bottom: AppSpacing.sm,
@@ -326,7 +368,10 @@ class _PhotoPicker extends StatelessWidget {
                     shape: const CircleBorder(),
                     child: IconButton(
                       onPressed: onTap,
-                      icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        color: Colors.white,
+                      ),
                       tooltip: 'Remplacer la photo',
                     ),
                   ),
@@ -340,9 +385,13 @@ class _PhotoPicker extends StatelessWidget {
 }
 
 class _PickPrompt extends StatelessWidget {
+  /// Invitation visuelle (icône + texte) affichée dans la zone de photo.
   const _PickPrompt({required this.icon, required this.label});
 
+  /// Icône illustrant l'état.
   final IconData icon;
+
+  /// Texte explicatif affiché sous l'icône.
   final String label;
 
   @override
@@ -355,7 +404,8 @@ class _PickPrompt extends StatelessWidget {
           Icon(
             icon,
             size: 40,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.4),
           ),
           const SizedBox(height: AppSpacing.md),
           Padding(
@@ -364,9 +414,7 @@ class _PickPrompt extends StatelessWidget {
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
+                color: Theme.of(context).colorScheme.onSurface
                     .withValues(alpha: 0.6),
               ),
             ),

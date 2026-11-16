@@ -3,10 +3,10 @@
 /// Le schéma suit le cahier des charges §5. Les migrations sont versionnées
 /// via le numéro de version de la base (`app_database.dart`).
 abstract final class DatabaseMigrations {
-  /// Version courante du schéma.
+  /// Version courante du schéma de la base de données.
   static const int schemaVersion = 1;
 
-  /// Migrations indexées par version cible : `migrations[n]` s'exécute pour
+  /// Migrations indexées par version cible : `byVersion[n]` s'exécute pour
   /// passer de la version `n - 1` à la version `n`.
   static const Map<int, List<String>> byVersion = <int, List<String>>{
     1: <String>[
@@ -20,6 +20,7 @@ abstract final class DatabaseMigrations {
     ],
   };
 
+  /// Script SQL de création de la table des clients.
   static const String _createClients = '''
 CREATE TABLE clients (
   id TEXT PRIMARY KEY,
@@ -32,6 +33,7 @@ CREATE TABLE clients (
 )
 ''';
 
+  /// Script SQL de création de la table des jeux de mensurations.
   static const String _createMeasurementSets = '''
 CREATE TABLE measurement_sets (
   id TEXT PRIMARY KEY,
@@ -44,6 +46,7 @@ CREATE TABLE measurement_sets (
 )
 ''';
 
+  /// Script SQL de création de la table des mesures individuelles.
   static const String _createMeasurements = '''
 CREATE TABLE measurements (
   id TEXT PRIMARY KEY,
@@ -55,6 +58,7 @@ CREATE TABLE measurements (
 )
 ''';
 
+  /// Script SQL de création de la table des modèles de vêtements.
   static const String _createGarmentModels = '''
 CREATE TABLE garment_models (
   id TEXT PRIMARY KEY,
@@ -68,6 +72,7 @@ CREATE TABLE garment_models (
 )
 ''';
 
+  /// Script SQL de création de la table des commandes.
   static const String _createOrders = '''
 CREATE TABLE orders (
   id TEXT PRIMARY KEY,
@@ -90,6 +95,7 @@ CREATE TABLE orders (
 )
 ''';
 
+  /// Script SQL de création de la table des paiements.
   static const String _createPayments = '''
 CREATE TABLE payments (
   id TEXT PRIMARY KEY,
@@ -102,6 +108,7 @@ CREATE TABLE payments (
 )
 ''';
 
+  /// Scripts SQL de création des index pour optimiser les requêtes fréquentes.
   static const List<String> _createIndexes = <String>[
     'CREATE INDEX idx_clients_name ON clients (full_name)',
     'CREATE INDEX idx_clients_phone ON clients (phone)',

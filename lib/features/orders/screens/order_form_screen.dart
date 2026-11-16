@@ -18,13 +18,12 @@ import '../../gallery/models/garment_model.dart';
 import '../../measurements/models/measurement_set.dart';
 import '../models/order.dart';
 
-/// Formulaire de création / modification d'une commande (§4.5).
+/// Formulaire de création ou de modification d'une commande (§4.5).
 ///
 /// Une commande peut référencer un modèle de la galerie et un jeu de
-/// mensurations, ou exister sans (modèle personnalisé). Le nom du modèle est
-/// copié au moment de la commande (snapshot), pour ne pas changer
-/// rétroactivement si le modèle évolue ensuite.
+/// mensurations, ou exister sans référence (modèle personnalisé).
 class OrderFormScreen extends StatefulWidget {
+  /// Crée le formulaire de commande.
   const OrderFormScreen({super.key, this.preselectedClientId, this.orderId});
 
   /// Client pré-sélectionné lorsqu'on crée depuis sa fiche.
@@ -33,50 +32,86 @@ class OrderFormScreen extends StatefulWidget {
   /// `null` en création, identifiant de la commande en modification.
   final String? orderId;
 
+  /// Indique si le formulaire est en mode modification.
   bool get isEditing => orderId != null;
 
+  /// Crée l'état associé à cet écran.
   @override
   State<OrderFormScreen> createState() => _OrderFormScreenState();
 }
 
+/// État de [OrderFormScreen] gérant la saisie, la validation et l'enregistrement.
 class _OrderFormScreenState extends State<OrderFormScreen>
     with DataEventsListener<OrderFormScreen> {
+  /// Dépôt des clients.
   final ClientRepository _clients = ClientRepository();
+
+  /// Dépôt des modèles de la galerie.
   final GarmentModelRepository _models = GarmentModelRepository();
+
+  /// Dépôt des mensurations.
   final MeasurementRepository _measurements = MeasurementRepository();
+
+  /// Dépôt des commandes.
   final OrderRepository _orders = OrderRepository();
 
+  /// Clé du formulaire pour la validation.
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  /// Contrôleur du champ de description.
   final TextEditingController _description = TextEditingController();
+
+  /// Contrôleur du champ de quantité.
   final TextEditingController _quantity = TextEditingController(text: '1');
+
+  /// Contrôleur du champ de prix total.
   final TextEditingController _price = TextEditingController();
+
+  /// Contrôleur du champ de notes.
   final TextEditingController _notes = TextEditingController();
 
+  /// Futur contenant les options nécessaires au formulaire.
   Future<_OrderFormData>? _future;
 
+  /// Commande existante en mode modification.
   Order? _existing;
+
+  /// Client sélectionné.
   Client? _client;
+
+  /// Modèle sélectionné.
   GarmentModel? _model;
+
+  /// Jeu de mensurations sélectionné.
   MeasurementSet? _measurementSet;
+
+  /// Date de livraison prévue.
   DateTime _deliveryAt = DateTime.now().add(const Duration(days: 7));
+
+  /// Indique si un enregistrement est en cours.
   bool _saving = false;
 
+  /// Indique si le formulaire a déjà été initialisé.
+  ///
   /// Le formulaire n'est pré-rempli qu'une fois : un rafraîchissement des
-  /// listes (client ajouté, modèle modifié) ne doit pas écraser la saisie.
+  /// listes ne doit pas écraser la saisie en cours.
   bool _initialized = false;
 
+  /// Entités dont les changements déclenchent un rechargement des options.
   @override
   Set<DataEntity> get dataEntities => const <DataEntity>{
-        DataEntity.clients,
-        DataEntity.models,
-      };
+    DataEntity.clients,
+    DataEntity.models,
+  };
 
+  /// Initialise l'état et charge les options du formulaire.
   @override
   void initState() {
     super.initState();
     _future = _loadOptions();
   }
 
+  /// Recharge les options lorsque les données écoutées changent.
   @override
   void onDataChanged() {
     setState(() {
@@ -84,6 +119,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
     });
   }
 
+  /// Libère les contrôleurs de texte.
   @override
   void dispose() {
     _description.dispose();
@@ -93,6 +129,9 @@ class _OrderFormScreenState extends State<OrderFormScreen>
     super.dispose();
   }
 
+  /// Charge les clients et modèles disponibles pour le formulaire.
+  ///
+  /// Pré-remplit les champs depuis la commande existante au premier chargement.
   Future<_OrderFormData> _loadOptions() async {
     final List<Client> clients = await _clients.list();
     final List<GarmentModel> models = await _models.list();
@@ -105,8 +144,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
     return _OrderFormData(clients: clients, models: models);
   }
 
-  /// Reprend les valeurs de la commande modifiée (ou le client présélectionné)
-  /// au premier chargement uniquement.
+  /// Reprend les valeurs de la commande modifiée ou du client présélectionné.
   Future<void> _fillFromExisting() async {
     if (widget.isEditing) {
       final Order? order = await _orders.findById(widget.orderId!);
@@ -114,7 +152,9 @@ class _OrderFormScreenState extends State<OrderFormScreen>
         throw StateError('Commande introuvable');
       }
       _existing = order;
-      _client = await _clients.findById(order.clientId) ??
+      // Récupération du client avec repli si le client est introuvable.
+      _client =
+          await _clients.findById(order.clientId) ??
           Client(
             id: order.clientId,
             fullName: 'Client inconnu',
@@ -122,13 +162,15 @@ class _OrderFormScreenState extends State<OrderFormScreen>
             updatedAt: order.updatedAt,
             isArchived: true,
           );
+      // Récupération du modèle référencé, éventuellement archivé.
       if (order.garmentModelId != null) {
-        // Le modèle peut avoir été archivé : on le cherche sans filtre.
         _model = await _models.findById(order.garmentModelId!);
       }
+      // Récupération du jeu de mensurations de référence.
       if (order.measurementSetId != null) {
-        _measurementSet =
-            await _measurements.findSetById(order.measurementSetId!);
+        _measurementSet = await _measurements.findSetById(
+          order.measurementSetId!,
+        );
       }
       _description.text = order.description ?? '';
       _quantity.text = '${order.quantity}';
@@ -140,6 +182,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
     }
   }
 
+  /// Ouvre le sélecteur de client et met à jour la sélection.
   Future<void> _selectClient() async {
     final _OrderFormData? data = await _future;
     if (!mounted || data == null) return;
@@ -148,6 +191,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
       isScrollControlled: true,
       builder: (BuildContext ctx) => _ClientPicker(clients: data.clients),
     );
+    // Réinitialisation des mensurations lors du changement de client.
     if (picked != null) {
       setState(() {
         _client = picked;
@@ -156,6 +200,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
     }
   }
 
+  /// Ouvre le sélecteur de modèle de la galerie.
   Future<void> _selectModel() async {
     final _OrderFormData? data = await _future;
     if (!mounted || data == null) return;
@@ -167,11 +212,14 @@ class _OrderFormScreenState extends State<OrderFormScreen>
     if (mounted) setState(() => _model = picked);
   }
 
+  /// Ouvre le sélecteur de jeu de mensurations pour le client choisi.
   Future<void> _selectMeasurementSet() async {
     if (_client == null) return;
-    final List<MeasurementSet> sets =
-        await _measurements.listSetsForClient(_client!.id);
+    final List<MeasurementSet> sets = await _measurements.listSetsForClient(
+      _client!.id,
+    );
     if (!mounted) return;
+    // Signalement si aucun jeu de mensurations n'est disponible.
     if (sets.isEmpty) {
       showAppSnackBar(
         context,
@@ -188,6 +236,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
     if (mounted) setState(() => _measurementSet = picked);
   }
 
+  /// Ouvre le sélecteur de date de livraison.
   Future<void> _pickDeliveryDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -199,28 +248,30 @@ class _OrderFormScreenState extends State<OrderFormScreen>
     if (picked != null) setState(() => _deliveryAt = picked);
   }
 
+  /// Valide et enregistre la commande en création ou en modification.
   Future<void> _save() async {
+    // Validation de la sélection du client.
     if (_client == null) {
-      showAppSnackBar(
-        context,
-        message: 'Choisissez un client.',
-        isError: true,
-      );
+      showAppSnackBar(context, message: 'Choisissez un client.', isError: true);
       return;
     }
+    // Validation des champs du formulaire.
     if (!_formKey.currentState!.validate()) return;
 
     final DateTime now = DateTime.now();
     final int quantity = int.parse(_quantity.text.trim());
     final int totalPrice = int.parse(_price.text.trim());
-    final String? description =
-        _description.text.trim().isEmpty ? null : _description.text.trim();
-    final String? notes =
-        _notes.text.trim().isEmpty ? null : _notes.text.trim();
+    final String? description = _description.text.trim().isEmpty
+        ? null
+        : _description.text.trim();
+    final String? notes = _notes.text.trim().isEmpty
+        ? null
+        : _notes.text.trim();
 
     setState(() => _saving = true);
     try {
       if (_existing == null) {
+        // Création d'une nouvelle commande avec les valeurs saisies.
         final Order order = Order(
           id: newId(),
           clientId: _client!.id,
@@ -239,9 +290,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
         );
         await _orders.insert(order);
       } else {
-        // Le modèle et les mensurations peuvent être modifiés ; le snapshot
-        // suit alors le choix courant. Les paiements et l'identifiant de la
-        // commande restent inchangés.
+        // Mise à jour de la commande existante en préservant les paiements.
         final bool removeModel =
             _model == null && _existing!.garmentModelId != null;
         await _orders.update(
@@ -273,6 +322,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
       );
       Navigator.of(context).pop(true);
     } catch (_) {
+      // Gestion d'une erreur d'enregistrement.
       if (!mounted) return;
       setState(() => _saving = false);
       showAppSnackBar(
@@ -283,19 +333,23 @@ class _OrderFormScreenState extends State<OrderFormScreen>
     }
   }
 
+  /// Construit l'interface du formulaire de commande.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isEditing ? 'Modifier la commande' : 'Nouvelle commande'),
+        title: Text(
+          widget.isEditing ? 'Modifier la commande' : 'Nouvelle commande',
+        ),
       ),
       body: FutureBuilder<_OrderFormData>(
         future: _future,
-        builder: (BuildContext context,
-            AsyncSnapshot<_OrderFormData> snapshot) {
+        builder: (BuildContext context, AsyncSnapshot<_OrderFormData> snapshot) {
+          // Affichage d'un indicateur pendant le chargement.
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          // Affichage d'un message en cas d'erreur de chargement.
           if (snapshot.hasError) {
             return Center(
               child: Padding(
@@ -307,10 +361,9 @@ class _OrderFormScreenState extends State<OrderFormScreen>
               ),
             );
           }
+          // Redirection vers la création de client si aucun client n'existe.
           if (snapshot.data!.clients.isEmpty) {
-            return _NeedClient(
-              onAdd: () => context.push('/clients/nouveau'),
-            );
+            return _NeedClient(onAdd: () => context.push('/clients/nouveau'));
           }
           return Form(
             key: _formKey,
@@ -360,7 +413,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
                   value: _measurementSet == null
                       ? null
                       : '${_measurementSet!.garmentType} — '
-                          '${Formatters.date(_measurementSet!.measuredAt)}',
+                            '${Formatters.date(_measurementSet!.measuredAt)}',
                   hint: _client == null
                       ? 'Choisissez d\'abord un client'
                       : 'Associer des mensurations',
@@ -390,6 +443,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
                           labelText: 'Quantité *',
                         ),
                         validator: (String? value) {
+                          // Validation de la quantité saisie.
                           final int? q = int.tryParse((value ?? '').trim());
                           if (q == null || q < 1) {
                             return 'La quantité doit être au moins égale à 1.';
@@ -411,6 +465,7 @@ class _OrderFormScreenState extends State<OrderFormScreen>
                           suffixText: 'FCFA',
                         ),
                         validator: (String? value) {
+                          // Validation du prix total saisi.
                           final int? price = int.tryParse((value ?? '').trim());
                           if (price == null) {
                             return 'Choisissez un montant.';
@@ -468,18 +523,27 @@ class _OrderFormScreenState extends State<OrderFormScreen>
   }
 }
 
+/// Données nécessaires à l'initialisation du formulaire de commande.
 class _OrderFormData {
+  /// Crée un conteneur des options du formulaire.
   const _OrderFormData({required this.clients, required this.models});
 
+  /// Liste des clients disponibles.
   final List<Client> clients;
+
+  /// Liste des modèles disponibles.
   final List<GarmentModel> models;
 }
 
+/// Message affiché lorsqu'aucun client n'est disponible pour créer une commande.
 class _NeedClient extends StatelessWidget {
+  /// Crée le widget invitant à ajouter un client.
   const _NeedClient({required this.onAdd});
 
+  /// Action de navigation vers la création d'un client.
   final VoidCallback onAdd;
 
+  /// Construit le message et le bouton d'action.
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -491,9 +555,7 @@ class _NeedClient extends StatelessWidget {
             Icon(
               Icons.people_outline,
               size: 56,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
+              color: Theme.of(context).colorScheme.onSurface
                   .withValues(alpha: 0.35),
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -513,7 +575,9 @@ class _NeedClient extends StatelessWidget {
   }
 }
 
+/// Tuile cliquable permettant de sélectionner une valeur dans le formulaire.
 class _PickerTile extends StatelessWidget {
+  /// Crée une tuile de sélection.
   const _PickerTile({
     required this.icon,
     required this.label,
@@ -523,13 +587,25 @@ class _PickerTile extends StatelessWidget {
     this.leading,
   });
 
+  /// Icône affichée lorsque [leading] est absent.
   final IconData icon;
+
+  /// Libellé du champ.
   final String label;
+
+  /// Texte indicatif affiché en l'absence de valeur.
   final String hint;
+
+  /// Valeur sélectionnée, le cas échéant.
   final String? value;
+
+  /// Widget optionnel affiché à gauche de la tuile.
   final Widget? leading;
+
+  /// Action déclenchée lors du clic.
   final VoidCallback? onTap;
 
+  /// Construit la tuile de sélection.
   @override
   Widget build(BuildContext context) {
     final bool hasValue = value != null;
@@ -550,10 +626,8 @@ class _PickerTile extends StatelessWidget {
                 Icon(
                   icon,
                   color: onTap == null
-                      ? Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.35)
+                      ? Theme.of(context).colorScheme.onSurface
+                            .withValues(alpha: 0.35)
                       : Theme.of(context).colorScheme.primary,
                 ),
               const SizedBox(width: AppSpacing.md),
@@ -565,9 +639,7 @@ class _PickerTile extends StatelessWidget {
                       label,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
+                        color: Theme.of(context).colorScheme.onSurface
                             .withValues(alpha: 0.6),
                       ),
                     ),
@@ -576,21 +648,19 @@ class _PickerTile extends StatelessWidget {
                       hasValue ? value! : hint,
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight:
-                            hasValue ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight: hasValue
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                         color: hasValue
                             ? null
-                            : Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.5),
+                            : Theme.of(context).colorScheme.onSurface
+                                  .withValues(alpha: 0.5),
                       ),
                     ),
                   ],
                 ),
               ),
-              if (onTap != null)
-                const Icon(Icons.chevron_right, size: 20),
+              if (onTap != null) const Icon(Icons.chevron_right, size: 20),
             ],
           ),
         ),
@@ -599,11 +669,15 @@ class _PickerTile extends StatelessWidget {
   }
 }
 
+/// Feuille de sélection d'un client.
 class _ClientPicker extends StatelessWidget {
+  /// Crée le sélecteur de client.
   const _ClientPicker({required this.clients});
 
+  /// Liste des clients sélectionnables.
   final List<Client> clients;
 
+  /// Construit la feuille de sélection.
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -631,6 +705,7 @@ class _ClientPicker extends StatelessWidget {
                     leading: const CircleAvatar(child: Icon(Icons.person)),
                     title: Text(client.fullName),
                     subtitle: client.phone == null ? null : Text(client.phone!),
+                    // Retourne le client sélectionné à l'appelant.
                     onTap: () => Navigator.of(context).pop(client),
                   );
                 },
@@ -643,11 +718,15 @@ class _ClientPicker extends StatelessWidget {
   }
 }
 
+/// Feuille de sélection d'un modèle de la galerie.
 class _ModelPicker extends StatelessWidget {
+  /// Crée le sélecteur de modèle.
   const _ModelPicker({required this.models});
 
+  /// Liste des modèles sélectionnables.
   final List<GarmentModel> models;
 
+  /// Construit la feuille de sélection.
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -666,6 +745,7 @@ class _ModelPicker extends StatelessWidget {
               ),
             ),
             Expanded(
+              // Affichage d'un message si la galerie est vide.
               child: models.isEmpty
                   ? const Center(
                       child: Padding(
@@ -699,6 +779,7 @@ class _ModelPicker extends StatelessWidget {
                           subtitle: model.category == null
                               ? null
                               : Text(model.category!),
+                          // Retourne le modèle sélectionné à l'appelant.
                           onTap: () => Navigator.of(context).pop(model),
                         );
                       },
@@ -711,11 +792,15 @@ class _ModelPicker extends StatelessWidget {
   }
 }
 
+/// Feuille de sélection d'un jeu de mensurations.
 class _MeasurementSetPicker extends StatelessWidget {
+  /// Crée le sélecteur de mensurations.
   const _MeasurementSetPicker({required this.sets});
 
+  /// Liste des jeux de mensurations sélectionnables.
   final List<MeasurementSet> sets;
 
+  /// Construit la feuille de sélection.
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
@@ -742,8 +827,10 @@ class _MeasurementSetPicker extends StatelessWidget {
                   return ListTile(
                     leading: const Icon(Icons.straighten),
                     title: Text(set.garmentType),
-                    subtitle:
-                        Text('Prise le ${Formatters.date(set.measuredAt)}'),
+                    subtitle: Text(
+                      'Prise le ${Formatters.date(set.measuredAt)}',
+                    ),
+                    // Retourne le jeu de mensurations sélectionné.
                     onTap: () => Navigator.of(context).pop(set),
                   );
                 },
@@ -756,9 +843,12 @@ class _MeasurementSetPicker extends StatelessWidget {
   }
 }
 
+/// Poignée visuelle affichée en haut des feuilles modales.
 class _SheetHandle extends StatelessWidget {
+  /// Crée la poignée de feuille modale.
   const _SheetHandle();
 
+  /// Construit la poignée visuelle.
   @override
   Widget build(BuildContext context) {
     return Container(

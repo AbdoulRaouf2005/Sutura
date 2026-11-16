@@ -6,11 +6,13 @@ import '../../features/measurements/models/measurement_set.dart';
 
 /// Accès aux mensurations (tables `measurement_sets` et `measurements`).
 class MeasurementRepository {
+  /// Crée le dépôt avec une base optionnelle [db].
   MeasurementRepository({AppDatabase? db}) : _db = db ?? AppDatabase.instance;
 
+  /// Instance de base de données utilisée pour les opérations.
   final AppDatabase _db;
 
-  /// Jeux de mensurations d'un client, du plus récent au plus ancien.
+  /// Retourne les jeux de mensurations d'un client [clientId], du plus récent au plus ancien.
   Future<List<MeasurementSet>> listSetsForClient(String clientId) async {
     final db = await _db.database;
     final List<Map<String, Object?>> rows = await db.query(
@@ -22,6 +24,9 @@ class MeasurementRepository {
     return rows.map(MeasurementSet.fromMap).toList();
   }
 
+  /// Recherche un jeu de mensurations par son identifiant [id].
+  ///
+  /// Retourne le jeu trouvé ou `null` s'il n'existe pas.
   Future<MeasurementSet?> findSetById(String id) async {
     final db = await _db.database;
     final List<Map<String, Object?>> rows = await db.query(
@@ -33,6 +38,7 @@ class MeasurementRepository {
     return rows.isEmpty ? null : MeasurementSet.fromMap(rows.first);
   }
 
+  /// Liste les mesures individuelles appartenant au jeu [setId].
   Future<List<Measurement>> listMeasurements(String setId) async {
     final db = await _db.database;
     final List<Map<String, Object?>> rows = await db.query(
@@ -44,13 +50,14 @@ class MeasurementRepository {
     return rows.map(Measurement.fromMap).toList();
   }
 
-  /// Enregistre un jeu de mensurations et toutes ses mesures dans une
-  /// transaction (cahier des charges §5).
+  /// Enregistre un jeu de mensurations [set] et ses [measurements] dans une
+  /// transaction (cahier des charges §5), puis notifie les écouteurs.
   Future<void> insertSet(
     MeasurementSet set,
     List<Measurement> measurements,
   ) async {
     final db = await _db.database;
+    // Insertion atomique du jeu et de ses mesures.
     await db.transaction((Transaction txn) async {
       await txn.insert(
         'measurement_sets',
@@ -68,8 +75,10 @@ class MeasurementRepository {
     DataController.instance.notify(DataEntity.measurements);
   }
 
+  /// Supprime le jeu [setId] et toutes ses mesures dans une transaction.
   Future<void> deleteSet(String setId) async {
     final db = await _db.database;
+    // Suppression atomique des mesures puis du jeu parent.
     await db.transaction((Transaction txn) async {
       await txn.delete(
         'measurements',

@@ -8,33 +8,44 @@ import '../../features/orders/models/order.dart';
 /// Pastille de statut : toujours une icône + un libellé, jamais la couleur
 /// seule (guide §2 et §11).
 class StatusBadge extends StatelessWidget {
+  /// Crée une pastille pour le statut [status] d'une commande.
   const StatusBadge({super.key, required this.status});
 
+  /// Statut de commande représenté par la pastille.
   final OrderStatus status;
 
+  /// Renvoie la couleur et l'icône associées au statut courant.
+  ///
+  /// Chaque statut possède une icône distincte pour ne pas dépendre de la
+  /// seule couleur (accessibilité).
   ({Color color, IconData icon}) _style(BuildContext context) {
     final AppSemanticColors semantic = AppSemanticColors.of(context);
     return switch (status) {
+      // Commande pas encore démarrée.
       OrderStatus.toStart => (
-            color: semantic.onSurfaceMuted,
-            icon: Icons.schedule_outlined,
-          ),
+        color: semantic.onSurfaceMuted,
+        icon: Icons.schedule_outlined,
+      ),
+      // Commande en cours de confection.
       OrderStatus.inProgress => (
-            color: AppColors.accent,
-            icon: Icons.construction_outlined,
-          ),
+        color: AppColors.accent,
+        icon: Icons.construction_outlined,
+      ),
+      // Commande prête à être récupérée.
       OrderStatus.ready => (
-            color: semantic.success,
-            icon: Icons.check_circle_outline,
-          ),
+        color: semantic.success,
+        icon: Icons.check_circle_outline,
+      ),
+      // Commande livrée au client.
       OrderStatus.delivered => (
-            color: semantic.success,
-            icon: Icons.local_shipping_outlined,
-          ),
+        color: semantic.success,
+        icon: Icons.local_shipping_outlined,
+      ),
+      // Commande annulée.
       OrderStatus.cancelled => (
-            color: semantic.error,
-            icon: Icons.cancel_outlined,
-          ),
+        color: semantic.error,
+        icon: Icons.cancel_outlined,
+      ),
     };
   }
 
@@ -42,6 +53,7 @@ class StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final ({Color color, IconData icon}) style = _style(context);
     return Container(
+      // Fond coloré translucide arrondi en forme de pastille.
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.xs,

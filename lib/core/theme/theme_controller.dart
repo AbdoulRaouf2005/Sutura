@@ -9,15 +9,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// - `themeMode: ThemeController.instance.themeMode` sur le `MaterialApp` ;
 /// - `ThemeController.instance.setThemeMode(mode)` depuis les réglages.
 class ThemeController extends ChangeNotifier {
+  /// Constructeur privé pour le singleton.
   ThemeController._();
 
+  /// Instance unique du contrôleur de thème.
   static final ThemeController instance = ThemeController._();
 
+  /// Clé utilisée pour persister le mode de thème dans les préférences.
   static const String _prefsKey = 'theme_mode';
 
-  /// Le thème clair reste prioritaire pour la V1 (guide §2).
+  /// Mode de thème courant (clair par défaut pour la V1, guide §2).
   ThemeMode _themeMode = ThemeMode.light;
 
+  /// Retourne le mode de thème actuellement appliqué.
   ThemeMode get themeMode => _themeMode;
 
   /// Lit la préférence enregistrée. À appeler une fois au démarrage.
@@ -36,6 +40,9 @@ class ThemeController extends ChangeNotifier {
   }
 
   /// Bascule entre clair et sombre en partant du mode courant.
+  ///
+  /// [systemIsDark] indique si le système est en mode sombre, utilisé lorsque
+  /// le mode actuel est [ThemeMode.system].
   Future<void> toggleDark({required bool systemIsDark}) async {
     final bool isDark = switch (_themeMode) {
       ThemeMode.system => systemIsDark,
@@ -45,6 +52,7 @@ class ThemeController extends ChangeNotifier {
     await setThemeMode(isDark ? ThemeMode.light : ThemeMode.dark);
   }
 
+  /// Décode une chaîne [raw] en [ThemeMode], avec repli sur le mode clair.
   static ThemeMode _decode(String? raw) {
     return ThemeMode.values.firstWhere(
       (ThemeMode mode) => mode.name == raw,

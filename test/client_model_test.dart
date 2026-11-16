@@ -2,8 +2,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sutura/features/clients/models/client.dart';
 
 void main() {
+  /// Tests du modèle Client : sérialisation, champs optionnels et archivage.
   group('Client', () {
+    /// Vérifie qu'un aller-retour toMap/fromMap conserve tous les champs.
     test('sérialise et désérialise sans perte', () {
+      // Client complet servant de référence pour le round-trip.
       final Client client = Client(
         id: 'c1',
         fullName: 'Awa Diop',
@@ -13,6 +16,7 @@ void main() {
         updatedAt: DateTime(2026, 3, 2, 10),
       );
 
+      // Reconstruit le client à partir de sa représentation en map.
       final Client roundTrip = Client.fromMap(client.toMap());
 
       expect(roundTrip.id, client.id);
@@ -24,6 +28,7 @@ void main() {
       expect(roundTrip.isArchived, isFalse);
     });
 
+    /// Vérifie que les champs optionnels absents sont sérialisés en null.
     test('gère les champs optionnels absents', () {
       final Client client = Client(
         id: 'c2',
@@ -37,6 +42,7 @@ void main() {
       expect(map['is_archived'], 0);
     });
 
+    /// Vérifie que copyWith peut remettre le téléphone à null.
     test('copyWith permet d\'effacer un champ optionnel', () {
       final Client client = Client(
         id: 'c3',
@@ -50,6 +56,7 @@ void main() {
       expect(cleared.fullName, 'Fatou Ndiaye');
     });
 
+    /// Vérifie que copyWith active le drapeau d'archivage.
     test('archive un client via copyWith', () {
       final Client client = Client(
         id: 'c4',

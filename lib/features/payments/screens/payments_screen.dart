@@ -14,50 +14,66 @@ import '../../../shared/widgets/empty_state.dart';
 import '../../orders/models/order.dart';
 import '../models/payment.dart';
 
-/// Gestion des paiements d'une commande : liste des versements, ajout,
+/// Écran de gestion des paiements d'une commande : liste, ajout,
 /// total payé et solde (§4.6).
 class PaymentsScreen extends StatefulWidget {
+  /// Crée l'écran des paiements pour la commande [orderId].
   const PaymentsScreen({super.key, required this.orderId});
 
+  /// Identifiant de la commande concernée.
   final String orderId;
 
+  /// Crée l'état associé à cet écran.
   @override
   State<PaymentsScreen> createState() => _PaymentsScreenState();
 }
 
+/// État de [PaymentsScreen] gérant le chargement et les actions sur les paiements.
 class _PaymentsScreenState extends State<PaymentsScreen>
     with DataEventsListener<PaymentsScreen> {
+  /// Dépôt des paiements.
   final PaymentRepository _payments = PaymentRepository();
+
+  /// Dépôt des commandes.
   final OrderRepository _orders = OrderRepository();
 
+  /// Futur contenant les données des paiements de la commande.
   Future<_PaymentsData>? _future;
+
+  /// Indique si des modifications ont été effectuées depuis l'ouverture.
   bool _changed = false;
 
+  /// Entités dont les changements déclenchent un rechargement.
   @override
   Set<DataEntity> get dataEntities => const <DataEntity>{
-        DataEntity.payments,
-        DataEntity.orders,
-      };
+    DataEntity.payments,
+    DataEntity.orders,
+  };
 
+  /// Initialise l'état et charge les paiements.
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  /// Recharge les paiements lorsque les données écoutées changent.
   @override
   void onDataChanged() => _load();
 
+  /// Lance le chargement des paiements de la commande.
   void _load() {
     setState(() {
       _future = _fetch();
     });
   }
 
+  /// Récupère la commande, ses paiements et le solde calculé.
   Future<_PaymentsData> _fetch() async {
     final Order? order = await _orders.findById(widget.orderId);
     if (order == null) throw StateError('Commande introuvable');
     final List<Payment> payments = await _payments.listForOrder(widget.orderId);
+    // Calcul du total payé pour déterminer le solde.
     final int paid = await _payments.totalPaidForOrder(widget.orderId);
     return _PaymentsData(
       totalPrice: order.totalPrice,
@@ -66,6 +82,7 @@ class _PaymentsScreenState extends State<PaymentsScreen>
     );
   }
 
+  /// Ouvre le formulaire d'ajout puis recharge si un paiement a été créé.
   Future<void> _addPayment() async {
     final _PaymentsData? data = await _future;
     if (!mounted || data == null) return;
@@ -73,9 +90,7 @@ class _PaymentsScreenState extends State<PaymentsScreen>
       context: context,
       isScrollControlled: true,
       builder: (BuildContext ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: _PaymentForm(orderId: widget.orderId),
       ),
     );
@@ -84,11 +99,13 @@ class _PaymentsScreenState extends State<PaymentsScreen>
     }
   }
 
+  /// Supprime un paiement après confirmation utilisateur.
   Future<void> _deletePayment(Payment payment) async {
     final bool confirmed = await confirmAction(
       context,
       title: 'Supprimer ce paiement ?',
-      message: 'Le versement de ${Formatters.money(payment.amount)} sera '
+      message:
+          'Le versement de ${Formatters.money(payment.amount)} sera '
           'retiré de l\'historique de cette commande.',
       confirmLabel: 'Supprimer',
     );
@@ -98,11 +115,13 @@ class _PaymentsScreenState extends State<PaymentsScreen>
     _changed = true;
   }
 
+  /// Construit l'interface de gestion des paiements.
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
+        // Retourne un indicateur de modification à l'écran appelant.
         if (didPop) return;
         Navigator.of(context).pop(_changed);
       },
@@ -115,73 +134,87 @@ class _PaymentsScreenState extends State<PaymentsScreen>
         ),
         body: FutureBuilder<_PaymentsData>(
           future: _future,
-          builder: (BuildContext context,
-              AsyncSnapshot<_PaymentsData> snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError || !snapshot.hasData) {
-              return ErrorState(
-                message: 'Impossible de charger les paiements.',
-                onRetry: _load,
-              );
-            }
-            final _PaymentsData data = snapshot.data!;
-            return Column(
-              children: <Widget>[
-                _BalanceSummary(balance: data.balance),
-                Expanded(
-                  child: data.payments.isEmpty
-                      ? const EmptyState(
-                          icon: Icons.payments_outlined,
-                          message: 'Aucun paiement enregistré pour '
-                              'cette commande.',
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.lg,
-                            0,
-                            AppSpacing.lg,
-                            AppSpacing.xxl * 2,
-                          ),
-                          itemCount: data.payments.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: AppSpacing.sm),
-                          itemBuilder: (BuildContext context, int index) {
-                            final Payment payment = data.payments[index];
-                            return _PaymentTile(
-                              payment: payment,
-                              onDelete: () => _deletePayment(payment),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            );
-          },
+          builder:
+              (BuildContext context, AsyncSnapshot<_PaymentsData> snapshot) {
+                // Affichage d'un indicateur pendant le chargement.
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                // Affichage d'un état d'erreur en cas d'échec.
+                if (snapshot.hasError || !snapshot.hasData) {
+                  return ErrorState(
+                    message: 'Impossible de charger les paiements.',
+                    onRetry: _load,
+                  );
+                }
+                final _PaymentsData data = snapshot.data!;
+                return Column(
+                  children: <Widget>[
+                    _BalanceSummary(balance: data.balance),
+                    Expanded(
+                      child: data.payments.isEmpty
+                          ? const EmptyState(
+                              icon: Icons.payments_outlined,
+                              message:
+                                  'Aucun paiement enregistré pour '
+                                  'cette commande.',
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.lg,
+                                0,
+                                AppSpacing.lg,
+                                AppSpacing.xxl * 2,
+                              ),
+                              itemCount: data.payments.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: AppSpacing.sm),
+                              itemBuilder: (BuildContext context, int index) {
+                                final Payment payment = data.payments[index];
+                                return _PaymentTile(
+                                  payment: payment,
+                                  onDelete: () => _deletePayment(payment),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
         ),
       ),
     );
   }
 }
 
+/// Données agrégées pour l'écran des paiements.
 class _PaymentsData {
+  /// Crée un conteneur des données de paiements.
   const _PaymentsData({
     required this.totalPrice,
     required this.payments,
     required this.balance,
   });
 
+  /// Prix total de la commande.
   final int totalPrice;
+
+  /// Liste des paiements enregistrés.
   final List<Payment> payments;
+
+  /// Solde financier de la commande.
   final OrderBalance balance;
 }
 
+/// Carte résumant le total payé et le solde restant.
 class _BalanceSummary extends StatelessWidget {
+  /// Crée le résumé financier.
   const _BalanceSummary({required this.balance});
 
+  /// Solde financier à afficher.
   final OrderBalance balance;
 
+  /// Construit le résumé du solde.
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -209,6 +242,7 @@ class _BalanceSummary extends StatelessWidget {
                   context,
                   balance.isOverpaid ? 'Trop-perçu' : 'Reste à payer',
                   Formatters.money(
+                    // Affiche le montant trop-perçu ou le reste à payer.
                     balance.isOverpaid
                         ? balance.overpaidAmount
                         : balance.remaining,
@@ -216,8 +250,8 @@ class _BalanceSummary extends StatelessWidget {
                   balance.isSettled
                       ? AppSemanticColors.of(context).success
                       : (balance.isOverpaid
-                          ? Theme.of(context).colorScheme.primary
-                          : AppSemanticColors.of(context).warning),
+                            ? Theme.of(context).colorScheme.primary
+                            : AppSemanticColors.of(context).warning),
                 ),
               ),
             ],
@@ -227,6 +261,7 @@ class _BalanceSummary extends StatelessWidget {
     );
   }
 
+  /// Construit un bloc de résumé avec un libellé et une valeur colorée.
   Widget _summary(
     BuildContext context,
     String label,
@@ -239,8 +274,8 @@ class _BalanceSummary extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 13,
-            color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            color: Theme.of(context).colorScheme.onSurface
+                .withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -259,12 +294,18 @@ class _BalanceSummary extends StatelessWidget {
   }
 }
 
+/// Tuile affichant un paiement avec son détail et l'action de suppression.
 class _PaymentTile extends StatelessWidget {
+  /// Crée une tuile de paiement.
   const _PaymentTile({required this.payment, required this.onDelete});
 
+  /// Paiement à afficher.
   final Payment payment;
+
+  /// Action de suppression du paiement.
   final VoidCallback onDelete;
 
+  /// Construit la tuile de paiement.
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -291,25 +332,43 @@ class _PaymentTile extends StatelessWidget {
   }
 }
 
+/// Formulaire d'ajout d'un paiement pour une commande.
 class _PaymentForm extends StatefulWidget {
+  /// Crée le formulaire de paiement pour [orderId].
   const _PaymentForm({required this.orderId});
 
+  /// Identifiant de la commande concernée.
   final String orderId;
 
+  /// Crée l'état associé au formulaire.
   @override
   State<_PaymentForm> createState() => _PaymentFormState();
 }
 
+/// État du formulaire d'ajout d'un paiement.
 class _PaymentFormState extends State<_PaymentForm> {
+  /// Dépôt des paiements.
   final PaymentRepository _repo = PaymentRepository();
+
+  /// Clé du formulaire pour la validation.
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  /// Contrôleur du champ montant.
   final TextEditingController _amount = TextEditingController();
+
+  /// Contrôleur du champ note.
   final TextEditingController _note = TextEditingController();
 
+  /// Date du versement.
   DateTime _paidAt = DateTime.now();
+
+  /// Méthode de paiement sélectionnée.
   PaymentMethod? _method;
+
+  /// Indique si un enregistrement est en cours.
   bool _saving = false;
 
+  /// Libère les contrôleurs de texte.
   @override
   void dispose() {
     _amount.dispose();
@@ -317,6 +376,7 @@ class _PaymentFormState extends State<_PaymentForm> {
     super.dispose();
   }
 
+  /// Ouvre le sélecteur de date du versement.
   Future<void> _pickDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -328,7 +388,9 @@ class _PaymentFormState extends State<_PaymentForm> {
     if (picked != null) setState(() => _paidAt = picked);
   }
 
+  /// Valide et enregistre le paiement.
   Future<void> _save() async {
+    // Validation du formulaire avant enregistrement.
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
@@ -345,6 +407,7 @@ class _PaymentFormState extends State<_PaymentForm> {
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (_) {
+      // Gestion d'une erreur d'enregistrement.
       if (!mounted) return;
       setState(() => _saving = false);
       showAppSnackBar(
@@ -355,6 +418,7 @@ class _PaymentFormState extends State<_PaymentForm> {
     }
   }
 
+  /// Construit le formulaire d'ajout d'un paiement.
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -383,6 +447,7 @@ class _PaymentFormState extends State<_PaymentForm> {
                   suffixText: 'FCFA',
                 ),
                 validator: (String? value) {
+                  // Validation du montant saisi.
                   final int? amount = int.tryParse((value ?? '').trim());
                   if (amount == null || amount <= 0) {
                     return 'Saisissez un montant supérieur à zéro.';
@@ -440,12 +505,18 @@ class _PaymentFormState extends State<_PaymentForm> {
   }
 }
 
+/// Tuile affichant la date sélectionnée et permettant de la modifier.
 class _DateTile extends StatelessWidget {
+  /// Crée une tuile de sélection de date.
   const _DateTile({required this.date, required this.onTap});
 
+  /// Date actuellement sélectionnée.
   final DateTime date;
+
+  /// Action déclenchée pour modifier la date.
   final VoidCallback onTap;
 
+  /// Construit la tuile de date.
   @override
   Widget build(BuildContext context) {
     return Card(
