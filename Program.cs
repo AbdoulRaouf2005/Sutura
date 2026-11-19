@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using sutura_api.Application.Services;
+using sutura_api.Application.Interfaces;
 using sutura_api.Infrastructure.Data;
 using sutura_api.Api.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -91,6 +92,8 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddScoped<IAuthService,AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+// Le service Client est injecté dans ClientsController.
+builder.Services.AddScoped<IClientService, ClientService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

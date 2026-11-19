@@ -25,7 +25,6 @@
   <ItemGroup>
     <Folder Include="Api\Middleware\" />
     <Folder Include="Application\Mapping\" />
-    <Folder Include="Application\Interfaces\" />
   </ItemGroup>
 
 </Project>
