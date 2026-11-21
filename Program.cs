@@ -96,6 +96,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IMeasurementSetService, MeasurementSetService>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
+builder.Services.AddScoped<IGarmentModelService, GarmentModelService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
