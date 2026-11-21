@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using sutura_api.Application.DTOs.Client;
+using sutura_api.Application.DTOs.MeasurementSet;
 using sutura_api.Application.Interfaces;
 
 namespace sutura_api.Api.Controllers
@@ -12,10 +13,12 @@ namespace sutura_api.Api.Controllers
     public class ClientsController : ControllerBase
     {
         private readonly IClientService _clientService;
+        private readonly IMeasurementSetService _measurementSetService;
 
-        public ClientsController(IClientService clientService)
+        public ClientsController(IClientService clientService, IMeasurementSetService measurementSetService)
         {
             _clientService = clientService;
+            _measurementSetService = measurementSetService;
         }
 
         // L'atelier est lu dans le claim du token : Flutter ne l'envoie jamais dans le corps.
@@ -104,6 +107,41 @@ namespace sutura_api.Api.Controllers
                 return NotFound(new { message = "Client introuvable." });
 
             return NoContent();
+        }
+
+        // GET : api/v1/clients/{clientId}/measurements -> jeu de mensurations courant.
+        [HttpGet("{clientId:guid}/measurements")]
+        public async Task<IActionResult> GetMeasurements(Guid clientId)
+        {
+            if (!TryGetAtelierId(out var atelierId))
+                return Unauthorized(new { message = "Claim 'atelierId' absent du token." });
+
+            var response = await _measurementSetService.GetCurrentAsync(clientId, atelierId);
+
+            if (response == null)
+                return NotFound(new { message = "Client ou mensurations introuvables." });
+
+            return Ok(response);
+        }
+
+        // PUT : api/v1/clients/{clientId}/measurements -> remplace le jeu courant.
+        [HttpPut("{clientId:guid}/measurements")]
+        public async Task<IActionResult> ReplaceMeasurements(
+            Guid clientId,
+            [FromBody] MeasurementSetRequest request)
+        {
+            if (!TryGetAtelierId(out var atelierId))
+                return Unauthorized(new { message = "Claim 'atelierId' absent du token." });
+
+            if (request.ClientId != clientId)
+                return BadRequest(new { message = "L'Id du client du corps doit correspondre à celui de l'URL." });
+
+            var response = await _measurementSetService.ReplaceCurrentAsync(request, clientId, atelierId);
+
+            if (response == null)
+                return NotFound(new { message = "Client introuvable." });
+
+            return Ok(response);
         }
     }
 }
