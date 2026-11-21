@@ -2,8 +2,9 @@
 
 namespace sutura_api.Domain.Entities
 {
-    public class Client : BaseEntity
+    public class Client 
     {
+        public Guid Id { get; set; }
         public Guid AtelierId { get; set; }
 
         public string FullName { get; set; } = string.Empty;

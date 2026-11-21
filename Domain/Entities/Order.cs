@@ -4,8 +4,9 @@ using sutura_api.Domain.Enums;
 
 namespace sutura_api.Domain.Entities
 {
-    public class Order : BaseEntity
+    public class Order 
     {
+        public Guid Id { get; set; }
         public Guid AtelierId { get; set; }
 
         public Guid ClientId { get; set; }
@@ -28,6 +29,8 @@ namespace sutura_api.Domain.Entities
         public DateOnly DeliveryDate { get; set; }
 
         public OrderStatus Status { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
 
         public string? Notes { get; set; }
 

@@ -2,8 +2,9 @@
 
 namespace sutura_api.Domain.Entities
 {
-    public class Measurement : BaseEntity
+    public class Measurement 
     {
+        public Guid Id { get; set; }
         public Guid MeasurementSetId { get; set; }
 
         public string Name { get; set; } = string.Empty;

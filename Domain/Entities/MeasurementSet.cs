@@ -4,19 +4,18 @@ using sutura_api.Domain.Commun;
 
 namespace sutura_api.Domain.Entities
 {
-    public class MeasurementSet : BaseEntity
+    public class MeasurementSet 
     {
+        public Guid Id { get; set; }
         public Guid AtelierId { get; set; }
 
         public Guid ClientId { get; set; }
 
-        public string GarmentType { get; set; } = string.Empty;
-
         public string? Notes { get; set; }
 
         public DateOnly MeasuredAt { get; set; }
-
-        public Atelier Atelier { get; set; } = null!;
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set;}
 
         public Client Client { get; set; } = null!;
 
