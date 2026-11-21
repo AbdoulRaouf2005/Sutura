@@ -95,6 +95,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 // Le service Client est injecté dans ClientsController.
 builder.Services.AddScoped<IClientService, ClientService>();
 builder.Services.AddScoped<IMeasurementSetService, MeasurementSetService>();
+builder.Services.AddScoped<IPaymentService, PaymentService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
